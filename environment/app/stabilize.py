@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Meridian-2 directed lattice-relaxation simulation.
 
-Skeleton only. The relaxation rule, the mandated relaxation schedule, the surge
-term, the steady-state observables, and the grid_checksum serialization are all
-specified in /app/docs/model_spec.md. Fill in `stabilize` to evolve the lattice
-to its steady state and record the observables.
+Skeleton only. The form of the model and the output contract are in
+/app/docs/model_spec.md; the calibrated constants (overload threshold, surge
+divisor, base removal, eastward and southward fluxes) and the relaxation
+schedule are recorded in /app/docs/calibration_notebook.md and must be
+reconciled from it. Fill in `stabilize` to evolve the lattice to its steady
+state and record the observables.
 """
 
 from __future__ import annotations

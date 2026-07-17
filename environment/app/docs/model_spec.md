@@ -1,13 +1,20 @@
 # Meridian-2 directed lattice-relaxation model
 
-This is the authoritative definition of the Meridian-2 relaxation model: a
-discrete-time dynamical system on a two-dimensional integer lattice. Load
-accumulates at lattice sites and, wherever a site is overloaded, relaxes toward
-its south and east neighbours until the field reaches a stable steady state. It
-is a **directed, order-sensitive** cellular automaton — **not** the textbook
-four-neighbour abelian sandpile — and, unlike the classical model, its steady
-state depends on the order in which sites relax, so the relaxation schedule
-below is part of the model.
+This is the authoritative definition of the **structure** of the Meridian-2
+relaxation model and of the **output contract**. It is a discrete-time dynamical
+system on a two-dimensional integer lattice: load accumulates at lattice sites
+and, wherever a site is overloaded, relaxes toward its south and east neighbours
+until the field reaches a stable steady state. It is a **directed,
+order-sensitive** cellular automaton — **not** the textbook four-neighbour
+abelian sandpile — and, unlike the classical model, its steady state depends on
+the order in which sites relax.
+
+The exact numeric coefficients of the relaxation rule and the relaxation
+schedule are **not fixed here**. They are calibrated constants, and the
+authoritative record of their calibration is
+`/app/docs/calibration_notebook.md`. This document fixes only the *form* of the
+model and the *shape* of the output; the notebook fixes the numbers. See
+"Calibrated parameters" below.
 
 ## Lattice and initial load
 
@@ -22,49 +29,60 @@ column indices `0..C-1` left to right). Apply every deposit in order, adding
 `count` units of load to site `(row, col)`. Deposits may target the same site
 more than once.
 
-## Relaxation schedule (mandated order)
+## Relaxation rule (form)
 
-A site is **overloaded** when it holds 4 or more units. Relaxation proceeds one
-event at a time, in a fixed order:
+A site is **overloaded** when its load reaches the calibrated *overload
+threshold* `T`. The field is relaxed one event at a time according to the
+calibrated *relaxation schedule*. A single relaxation event at a site whose load
+at that moment is `c`:
 
-1. Among all currently overloaded sites, select the one with the smallest
-   `(row, col)` in lexicographic order (smallest row first, then smallest
-   column).
-2. **Relax that site exactly once** (see the relaxation rule below).
-3. Repeat until no overloaded sites remain.
+* computes a **surge** `s = c // D`, where `D` is the calibrated *surge divisor*
+  (integer division);
+* removes `R_base + s` units from the site, where `R_base` is the calibrated
+  *base removal*;
+* transports `E` units **east** (to the site one column to the right), where `E`
+  is the calibrated *eastward flux*;
+* transports `Sth + s` units **south** (to the site one row below), where `Sth`
+  is the calibrated *southward base flux*; the surge rides with the southward
+  transport, never the eastward.
 
-The dynamics are **not** order-independent: relaxing greedily (draining a site
-in one event), or relaxing sites in any other order, yields a different steady
-state. Relax exactly one site, exactly once, per event, always choosing the
-smallest index.
+Load is only ever transported south and east — never north or west — so every
+event drains toward the south-east and the field always converges. Load directed
+off the lattice (east from the last column, or south from the last row) leaves
+the domain and accumulates in the **spill** total.
 
-## Relaxation rule (one event)
+Conservation holds by construction: `R_base + s` removed each event equals
+`E + (Sth + s)` transported, so the calibrated fluxes must satisfy
+`R_base = E + Sth`. Use this as a consistency check when you reconcile the
+calibrated constants.
 
-Let `c` be the load on the site **at the moment it relaxes**, and let the
-**surge** be `s = c // 8` (integer division). One relaxation event:
+## Calibrated parameters
 
-* removes `4 + s` units from the site,
-* transports **2 units east** (to the site one column to the right), and
-* transports **2 + s units south** (to the site one row below).
+The following constants and the relaxation schedule are defined by the
+calibration record in `/app/docs/calibration_notebook.md`, **not** here:
 
-The surge flows entirely south; the eastward flux is always exactly 2. Because
-`s` depends on the site's load at relaxation time, and that load depends on flux
-delivered by earlier events, the schedule above is what makes the steady state
-well-defined.
+* `T` — overload threshold.
+* `D` — surge divisor.
+* `R_base` — base removal per event.
+* `E` — eastward flux.
+* `Sth` — southward base flux.
+* the **relaxation schedule** — how the next site to relax is chosen and how many
+  times it relaxes per event.
 
-Load directed off the lattice — east from the last column, or south from the
-last row — leaves the domain and accumulates in the **spill** total. Load is
-never transported north or west, so every event drains toward the south-east
-and the field always converges.
+The notebook is a working calibration record: it contains early draft estimates
+that were later revised. Reconcile it as an account that resolves over time —
+**where a draft estimate and a later recalibration disagree, the later
+recalibration governs** — and use the calibrated values that survive
+reconciliation. Do not read or import anything from `/tests` or `/solution`.
 
-## Steady-state observables
+## Steady-state observables (output contract)
 
 Record the steady state in `result.json` in the output directory (`/app/output`
 by default), with exactly these keys:
 
 * `rows`, `cols` — copied from the input.
 * `grid` — the steady-state lattice as a list of `R` rows, each a list of `C`
-  integers, every value in `0..3`.
+  integers, every value in `0 .. T-1`.
 * `total_firings` — the total number of single relaxation events performed.
 * `row_firings` — a list of `R` integers, the number of events in each row.
 * `spill` — the total load that left the lattice.
