@@ -19,9 +19,9 @@ from pathlib import Path
 def stabilize(rows: int, cols: int, drops: list[list[int]]) -> dict:
     """Evolve the Meridian-2 lattice to its steady state.
 
-    See /app/docs/model_spec.md for the relaxation rule, the mandated schedule
-    (relax the smallest-index overloaded site once per event), the surge term,
-    and the exact observable keys and checksum serialization.
+    See /app/docs/model_spec.md for the relaxation-rule form and the exact
+    observable keys and checksum serialization. Reconcile the calibrated
+    constants and the relaxation schedule from /app/docs/calibration_notebook.md.
     """
     raise NotImplementedError(
         "Implement the Meridian-2 model defined in /app/docs/model_spec.md"
