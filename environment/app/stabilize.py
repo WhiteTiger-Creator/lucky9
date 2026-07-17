@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Meridian chip-firing stabilizer.
+"""Meridian-2 chip-firing stabilizer (out of date).
 
-This draft implements the classic four-neighbour sandpile: it fires cells at a
-threshold of 4 and pushes one chip to each orthogonal neighbour. It predates
-the SE-draining rule and does not match the current model contract.
+This draft still implements the classic four-neighbour sandpile: it fires cells
+at a threshold of 4 and pushes one chip to each orthogonal neighbour. It predates
+the Meridian-2 model contract and does not reproduce its results.
 """
 
 from __future__ import annotations

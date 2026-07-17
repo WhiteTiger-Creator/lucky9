@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Reference stabilizer for the Meridian SE-draining chip-firing model.
+"""Reference stabilizer for the Meridian-2 SE-draining chip-firing model.
 
-Reads /app/data/drops.json, applies every chip drop, stabilizes under the
-directed firing rule in /app/docs/model_spec.md, and writes the stabilized
-grid and its derived quantities to the output directory.
+Implements the mandated single-firing schedule (smallest-index unstable cell
+fired once per step) with the state-dependent southward surge defined in
+/app/docs/model_spec.md, then writes the stabilized grid and derived quantities.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
 import json
-from collections import deque
 from pathlib import Path
 
 THRESHOLD = 4
@@ -24,41 +24,39 @@ def stabilize(rows: int, cols: int, drops: list[list[int]]) -> dict:
 
     fired = [[0] * cols for _ in range(rows)]
     spill = 0
-    queue = deque()
-    inq = [[False] * cols for _ in range(rows)]
-    for r in range(rows):
-        for c in range(cols):
-            if grid[r][c] >= THRESHOLD:
-                queue.append((r, c))
-                inq[r][c] = True
-
     total_firings = 0
-    while queue:
-        r, c = queue.popleft()
-        inq[r][c] = False
+
+    # min-heap keyed by (row, col) realises "fire the smallest-index unstable
+    # cell, once per step"; stale entries are skipped on pop.
+    heap = [(r, c) for r in range(rows) for c in range(cols) if grid[r][c] >= THRESHOLD]
+    heapq.heapify(heap)
+
+    while heap:
+        r, c = heapq.heappop(heap)
         if grid[r][c] < THRESHOLD:
             continue
-        times = grid[r][c] // THRESHOLD  # fire greedily; confluent either way
-        grid[r][c] -= times * THRESHOLD
-        fired[r][c] += times
-        total_firings += times
-        # send 2 East, 2 South per firing; off-grid drains to the sink
-        east_r, east_c = r, c + 1
-        south_r, south_c = r + 1, c
-        if east_c < cols:
-            grid[east_r][east_c] += 2 * times
-            if grid[east_r][east_c] >= THRESHOLD and not inq[east_r][east_c]:
-                queue.append((east_r, east_c))
-                inq[east_r][east_c] = True
+        surge = grid[r][c] // 8
+        grid[r][c] -= (4 + surge)
+        fired[r][c] += 1
+        total_firings += 1
+
+        if c + 1 < cols:
+            grid[r][c + 1] += 2
+            if grid[r][c + 1] >= THRESHOLD:
+                heapq.heappush(heap, (r, c + 1))
         else:
-            spill += 2 * times
-        if south_r < rows:
-            grid[south_r][south_c] += 2 * times
-            if grid[south_r][south_c] >= THRESHOLD and not inq[south_r][south_c]:
-                queue.append((south_r, south_c))
-                inq[south_r][south_c] = True
+            spill += 2
+
+        south = 2 + surge
+        if r + 1 < rows:
+            grid[r + 1][c] += south
+            if grid[r + 1][c] >= THRESHOLD:
+                heapq.heappush(heap, (r + 1, c))
         else:
-            spill += 2 * times
+            spill += south
+
+        if grid[r][c] >= THRESHOLD:
+            heapq.heappush(heap, (r, c))
 
     serialized = "\n".join(" ".join(str(v) for v in row) for row in grid)
     checksum = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
