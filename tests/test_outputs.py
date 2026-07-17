@@ -1,8 +1,9 @@
-"""Verifier for the Meridian SE-draining chip-firing task.
+"""Verifier for the Meridian-2 directed lattice-relaxation simulation.
 
-The agent's /app/stabilize.py is run against the shipped drops and against a
-held-out alternate input. Outputs are checked against exact fixtures and against
-model invariants (stabilization, chip conservation, independent checksum).
+The agent's /app/stabilize.py is run against the shipped initial load and against
+a held-out alternate load. Observables are checked against exact fixtures and
+against physical invariants (steady state, load conservation, independent
+checksum).
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def _run(tmp: Path, input_path: Path = DATA) -> dict:
 
 @pytest.fixture(scope="module")
 def result(tmp_path_factory) -> dict:
-    """Run the agent's stabilizer once on the shipped drops."""
+    """Run the agent's simulation once on the shipped initial load."""
     assert APP.exists(), "stabilize.py is missing"
     return _run(tmp_path_factory.mktemp("primary"))
 
@@ -46,7 +47,7 @@ def test_result_has_required_keys(result):
 
 
 def test_grid_matches_fixture(result):
-    """The stabilized grid matches the reference fixture exactly."""
+    """The steady-state lattice matches the reference fixture exactly."""
     assert result["grid"] == EXPECTED["grid"]
 
 
@@ -63,7 +64,7 @@ def test_checksum_matches_fixture(result):
 
 
 def test_grid_is_stabilized(result):
-    """Every stabilized cell holds a value in 0..3."""
+    """Every steady-state site holds a value in 0..3."""
     assert all(0 <= v <= 3 for row in result["grid"] for v in row)
 
 
@@ -74,7 +75,7 @@ def test_checksum_is_consistent_with_grid(result):
 
 
 def test_chip_conservation(result):
-    """Initial chips equal the chips left on the grid plus the spill."""
+    """Initial load equals the load left on the lattice plus the spill."""
     data = json.loads(DATA.read_text())
     initial = sum(n for _, _, n in data["drops"])
     on_grid = sum(v for row in result["grid"] for v in row)
@@ -92,7 +93,7 @@ def test_is_idempotent(result, tmp_path):
 
 
 def test_generalizes_to_alternate_input(tmp_path):
-    """The stabilizer produces the reference output for a held-out input."""
+    """The simulation produces the reference output for a held-out load."""
     alt_expected = json.loads((FIX / "alt_expected.json").read_text())
     got = _run(tmp_path, input_path=FIX / "alt_drops.json")
     assert got == alt_expected

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Meridian-2 SE-draining chip-firing simulation.
+"""Meridian-2 directed lattice-relaxation simulation.
 
-Skeleton only. The Meridian-2 toppling rule, the mandated firing schedule, the
-output keys, and the grid_checksum serialization are all specified in
-/app/docs/model_spec.md. Fill in `stabilize` to evolve the field to its
-stabilized configuration and emit result.json.
+Skeleton only. The relaxation rule, the mandated relaxation schedule, the surge
+term, the steady-state observables, and the grid_checksum serialization are all
+specified in /app/docs/model_spec.md. Fill in `stabilize` to evolve the lattice
+to its steady state and record the observables.
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ from pathlib import Path
 
 
 def stabilize(rows: int, cols: int, drops: list[list[int]]) -> dict:
-    """Evolve the Meridian-2 field to its stabilized configuration.
+    """Evolve the Meridian-2 lattice to its steady state.
 
-    See /app/docs/model_spec.md for the toppling rule, the mandated firing
-    schedule (fire the smallest-index unstable site once per step), the surge
-    term, and the exact result.json keys and checksum serialization.
+    See /app/docs/model_spec.md for the relaxation rule, the mandated schedule
+    (relax the smallest-index overloaded site once per event), the surge term,
+    and the exact observable keys and checksum serialization.
     """
     raise NotImplementedError(
         "Implement the Meridian-2 model defined in /app/docs/model_spec.md"

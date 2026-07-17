@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Reference stabilizer for the Meridian-2 SE-draining chip-firing model.
+"""Reference simulation for the Meridian-2 directed lattice-relaxation model.
 
-Implements the mandated single-firing schedule (smallest-index unstable cell
-fired once per step) with the state-dependent southward surge defined in
-/app/docs/model_spec.md, then writes the stabilized grid and derived quantities.
+Implements the mandated single-event schedule (smallest-index overloaded site
+relaxed once per event) with the state-dependent southward surge defined in
+/app/docs/model_spec.md, then records the steady-state lattice and observables.
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ def stabilize(rows: int, cols: int, drops: list[list[int]]) -> dict:
     spill = 0
     total_firings = 0
 
-    # min-heap keyed by (row, col) realises "fire the smallest-index unstable
-    # cell, once per step"; stale entries are skipped on pop.
+    # min-heap keyed by (row, col) realises "relax the smallest-index overloaded
+    # site, once per event"; stale entries are skipped on pop.
     heap = [(r, c) for r in range(rows) for c in range(cols) if grid[r][c] >= THRESHOLD]
     heapq.heapify(heap)
 
