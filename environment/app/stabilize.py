@@ -1,55 +1,29 @@
 #!/usr/bin/env python3
-"""Meridian-2 chip-firing stabilizer (out of date).
+"""Meridian-2 SE-draining chip-firing simulation.
 
-This draft still implements the classic four-neighbour sandpile: it fires cells
-at a threshold of 4 and pushes one chip to each orthogonal neighbour. It predates
-the Meridian-2 model contract and does not reproduce its results.
+Skeleton only. The Meridian-2 toppling rule, the mandated firing schedule, the
+output keys, and the grid_checksum serialization are all specified in
+/app/docs/model_spec.md. Fill in `stabilize` to evolve the field to its
+stabilized configuration and emit result.json.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 
-THRESHOLD = 4
-
 
 def stabilize(rows: int, cols: int, drops: list[list[int]]) -> dict:
-    grid = [[0] * cols for _ in range(rows)]
-    for r, c, n in drops:
-        grid[r][c] += n
+    """Evolve the Meridian-2 field to its stabilized configuration.
 
-    fired = [[0] * cols for _ in range(rows)]
-    spill = 0
-    changed = True
-    while changed:
-        changed = False
-        for r in range(rows):
-            for c in range(cols):
-                while grid[r][c] >= THRESHOLD:
-                    grid[r][c] -= THRESHOLD
-                    fired[r][c] += 1
-                    changed = True
-                    for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < rows and 0 <= nc < cols:
-                            grid[nr][nc] += 1
-                        else:
-                            spill += 1
-
-    serialized = "\n".join(" ".join(str(v) for v in row) for row in grid)
-    checksum = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-    return {
-        "rows": rows,
-        "cols": cols,
-        "grid": grid,
-        "total_firings": sum(sum(row) for row in fired),
-        "row_firings": [sum(row) for row in fired],
-        "spill": spill,
-        "grid_checksum": checksum,
-    }
+    See /app/docs/model_spec.md for the toppling rule, the mandated firing
+    schedule (fire the smallest-index unstable site once per step), the surge
+    term, and the exact result.json keys and checksum serialization.
+    """
+    raise NotImplementedError(
+        "Implement the Meridian-2 model defined in /app/docs/model_spec.md"
+    )
 
 
 def main() -> int:
