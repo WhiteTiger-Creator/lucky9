@@ -9,7 +9,7 @@ subcategories = []
 number_of_milestones = 0
 codebase_size = "minimal"
 languages = ["python"]
-tags = ["chip-firing", "abelian-sandpile", "cellular-automaton", "simulation", "lattice"]
+tags = ["chip-firing", "abelian-sandpile", "cellular-automaton", "simulation", "combinatorics"]
 expert_time_estimate_min = 90
 junior_time_estimate_min = 180
 
