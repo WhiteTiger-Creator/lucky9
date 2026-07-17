@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Meridian-2 flux-routing computation.
+"""Meridian-2 network transport computation.
 
-Skeleton only. The network format, canonicalization rules, the pathway
-definition and hop bound, the routed-flux (node-disjoint packing) objective, and
-the exact result.json keys and checksum serialization are all specified in
-/app/docs/model_spec.md. Fill in `route_flux` to compute the routing and record
-the observables.
+Skeleton only. The network format, the conditioning rules, the transport-channel
+definition and span bound, the sustained-flux observable (max_flux, the maximum
+flux over vertex-disjoint transport channels — NOT the per-site sum of strongest
+channels and NOT a greedy value), and the exact result.json keys and checksum
+serialization are all specified in /app/docs/model_spec.md. Fill in `route_flux`
+to evaluate the transport and record the observables.
 """
 
 from __future__ import annotations
@@ -16,15 +17,16 @@ from pathlib import Path
 
 
 def route_flux(node_count: int, edges: list[list[int]]) -> dict:
-    """Route the Meridian-2 flux network and return the result observables.
+    """Evaluate the Meridian-2 network transport and return the observables.
 
-    See /app/docs/model_spec.md for canonicalization, the pathway definition and
-    5-edge hop bound, the max_flux node-disjoint packing objective (which is NOT
-    the per-target sum of strongest pathways), the result keys, and the checksum
-    serialization.
+    See /app/docs/model_spec.md for the conditioning of the links, the
+    transport-channel definition and 5-link span bound, the max_flux sustained-
+    flux observable (the maximum flux over vertex-disjoint channels, which is NOT
+    the per-site sum of strongest channels and NOT a greedy value), the result
+    keys, and the checksum serialization.
     """
     raise NotImplementedError(
-        "Implement the Meridian-2 flux routing defined in /app/docs/model_spec.md"
+        "Implement the Meridian-2 network transport defined in /app/docs/model_spec.md"
     )
 
 
