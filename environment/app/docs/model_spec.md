@@ -1,96 +1,72 @@
-# Meridian-2 directed lattice-relaxation model
+# Meridian-2 flux-routing model
 
-This is the authoritative definition of the **structure** of the Meridian-2
-relaxation model and of the **output contract**. It is a discrete-time dynamical
-system on a two-dimensional integer lattice: load accumulates at lattice sites
-and, wherever a site is overloaded, relaxes toward its south and east neighbours
-until the field reaches a stable steady state. It is a **directed,
-order-sensitive** cellular automaton — **not** the textbook four-neighbour
-abelian sandpile — and, unlike the classical model, its steady state depends on
-the order in which sites relax.
+This is the authoritative definition of the Meridian-2 flux-routing model and of
+the output contract. The model is a combinatorial routing problem on a directed
+weighted network: from a single source, route as much flux as possible along
+**node-disjoint** simple directed pathways, then report the routed flux, the
+strongest single pathway, and integrity checksums.
 
-The exact numeric coefficients of the relaxation rule and the relaxation
-schedule are **not fixed here**. They are calibrated constants, and the
-authoritative record of their calibration is
-`/app/docs/calibration_notebook.md`. This document fixes only the *form* of the
-model and the *shape* of the output; the notebook fixes the numbers. See
-"Calibrated parameters" below.
+## Network input
 
-## Lattice and initial load
-
-The initial load (`/app/data/drops.json`) has the shape:
+The input (`/app/data/network.json`) has the shape:
 
 ```json
-{ "rows": R, "cols": C, "drops": [[row, col, count], ...] }
+{ "node_count": N, "edges": [[source, target, weight], ...] }
 ```
 
-Start from an `R x C` lattice of zeros (row indices `0..R-1` top to bottom,
-column indices `0..C-1` left to right). Apply every deposit in order, adding
-`count` units of load to site `(row, col)`. Deposits may target the same site
-more than once.
+Nodes are integers `0 .. N-1`. The **source** is node `0`. Each edge is a
+directed connection `source -> target` carrying an integer `weight`.
 
-## Relaxation rule (form)
+## Canonicalization
 
-A site is **overloaded** when its load reaches the calibrated *overload
-threshold* `T`. The field is relaxed one event at a time according to the
-calibrated *relaxation schedule*. A single relaxation event at a site whose load
-at that moment is `c`:
+Before routing, normalize the edge list:
 
-* computes a **surge** `s = c // D`, where `D` is the calibrated *surge divisor*
-  (integer division);
-* removes `R_base + s` units from the site, where `R_base` is the calibrated
-  *base removal*;
-* transports `E` units **east** (to the site one column to the right), where `E`
-  is the calibrated *eastward flux*;
-* transports `Sth + s` units **south** (to the site one row below), where `Sth`
-  is the calibrated *southward base flux*; the surge rides with the southward
-  transport, never the eastward.
+* Drop any self-loop (`source == target`).
+* Drop any edge whose weight is outside the valid range `1 .. 9` inclusive.
+* If the same directed pair `(source, target)` appears more than once, keep the
+  single edge with the **maximum** weight.
 
-Load is only ever transported south and east — never north or west — so every
-event drains toward the south-east and the field always converges. Load directed
-off the lattice (east from the last column, or south from the last row) leaves
-the domain and accumulates in the **spill** total.
+## Pathways
 
-Conservation holds by construction: `R_base + s` removed each event equals
-`E + (Sth + s)` transported, so the calibrated fluxes must satisfy
-`R_base = E + Sth`. Use this as a consistency check when you reconcile the
-calibrated constants.
+A **pathway** is a simple directed path that starts at the source: it follows
+edges in their directed sense, never repeats a node, and has between 1 and 5
+edges (the hop bound is 5). A pathway's **weight** is the sum of its edge
+weights. Enumerate every such pathway over the canonical edges.
 
-## Calibrated parameters
+## Routed flux (the objective)
 
-The following constants and the relaxation schedule are defined by the
-calibration record in `/app/docs/calibration_notebook.md`, **not** here:
+`max_flux` is the **maximum total weight of a set of node-disjoint pathways**
+out of the source. Two pathways are node-disjoint when they share no node other
+than the source. Choose the set of pathways — pairwise sharing only the source —
+that maximizes the summed pathway weight; the empty set scores 0.
 
-* `T` — overload threshold.
-* `D` — surge divisor.
-* `R_base` — base removal per event.
-* `E` — eastward flux.
-* `Sth` — southward base flux.
-* the **relaxation schedule** — how the next site to relax is chosen and how many
-  times it relaxes per event.
+**`max_flux` is NOT the sum of each reachable node's strongest pathway.** Because
+pathways compete for nodes, a node used by one pathway cannot be reused by
+another, so summing per-target best pathways over-counts shared nodes and is
+wrong. The routed flux is the best node-disjoint packing of pathways, which is
+in general strictly less than that sum.
 
-The notebook is a working calibration record: it contains early draft estimates
-that were later revised. Reconcile it as an account that resolves over time —
-**where a draft estimate and a later recalibration disagree, the later
-recalibration governs** — and use the calibrated values that survive
-reconciliation. Do not read or import anything from `/tests` or `/solution`.
+## Output
 
-## Steady-state observables (output contract)
+Write `result.json` to the output directory (`/app/output` by default) with
+exactly these keys:
 
-Record the steady state in `result.json` in the output directory (`/app/output`
-by default), with exactly these keys:
+* `node_count` — copied from the input.
+* `reachable` — the sorted list of distinct non-source nodes that appear as the
+  final node of at least one pathway.
+* `strongest_path` — the single highest-weight pathway, as a list of node ids
+  beginning with the source; ties are broken by the lexicographically smallest
+  full node sequence. If no pathway exists, use `[0]`.
+* `strongest_path_weight` — the weight of `strongest_path` (0 if none).
+* `max_flux` — the routed flux defined above (integer).
+* `edge_checksum` — the SHA-256 hex digest of the canonical edges serialized as
+  follows: for each `source` in ascending order, and each `target` of that
+  source in ascending order, the line `source|target|weight`; lines joined by a
+  single `\n`, no trailing newline; hash the UTF-8 encoding.
+* `flux_checksum` — the SHA-256 hex digest of the UTF-8 encoding of
+  `node_count|max_flux|strongest_path_weight|S|R` where `S` is the
+  `strongest_path` node ids joined by `>` and `R` is the `reachable` node ids
+  joined by `,`.
 
-* `rows`, `cols` — copied from the input.
-* `grid` — the steady-state lattice as a list of `R` rows, each a list of `C`
-  integers, every value in `0 .. T-1`.
-* `total_firings` — the total number of single relaxation events performed.
-* `row_firings` — a list of `R` integers, the number of events in each row.
-* `spill` — the total load that left the lattice.
-* `grid_checksum` — the SHA-256 hex digest of the steady-state lattice
-  serialized as follows: each row is its site values rendered in decimal and
-  joined by single spaces; rows are joined by a single newline (`\n`); there is
-  no trailing newline. Hash the UTF-8 encoding of that string.
-
-The simulation reads its initial load from `--input` (default
-`/app/data/drops.json`) and writes the steady-state observables under
-`--output-dir` (default `/app/output`).
+The program reads its network from `--input` (default `/app/data/network.json`)
+and writes to `--output-dir` (default `/app/output`).
