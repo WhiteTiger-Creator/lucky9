@@ -44,13 +44,22 @@ log; this contract fixes only the key set and the serializations below.
 * `total_path_efficiency` — sum of per-hop efficiency over the routed channels (per log).
 * `max_path_efficiency` — the largest per-hop efficiency over the routed channels (per log).
 * `mean_flux_floor` — the floored mean of the sustained flux over the routed count (per log).
+* `saturated_endpoints` — the terminal site ids (ascending) of the routed channels
+  admitted to the saturated set by the sequential throughput ledger (per the log).
+* `saturated_channel_count` — the number of ids in `saturated_endpoints`.
+* `max_throughput` — the maximum per-channel throughput over the routed channels.
+* `throughput_ledger_checksum` — the SHA-256 hex digest of the ledger rows serialized
+  as follows: for each routed channel in `flux_paths` order, the line
+  `endpoint|throughput|c|carry_out` where `endpoint` is the channel's terminal site,
+  and `c` is `1` if the channel is saturated else `0`; lines joined by a single `\n`,
+  no trailing newline; hash the UTF-8 encoding (throughput/flag/carry_out per the log).
 * `edge_checksum` — the SHA-256 hex digest of the conditioned links serialized as
   follows: for each `source` in ascending order, and each `target` of that source
   in ascending order, the line `source|target|weight`; lines joined by a single
   `\n`, no trailing newline; hash the UTF-8 encoding.
 * `flux_checksum` — the SHA-256 hex digest of the UTF-8 encoding of
-  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|total_path_efficiency|max_path_efficiency|mean_flux_floor|P`
-  where `S` is the `strongest_path` site ids joined by `>`, `R` is the
+  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|total_path_efficiency|max_path_efficiency|mean_flux_floor|saturated_channel_count|max_throughput|SE|P`
+  where `SE` is `saturated_endpoints` comma-joined ascending, `S` is the `strongest_path` site ids joined by `>`, `R` is the
   `reachable` site ids joined by `,`, and `P` joins the `flux_paths` channels
   with `;`, each channel's site ids joined by `>`.
 

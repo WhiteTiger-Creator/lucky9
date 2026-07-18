@@ -57,6 +57,14 @@
   "total_path_efficiency": 39,
   "max_path_efficiency": 8,
   "mean_flux_floor": 12,
+  "saturated_endpoints": [
+    4,
+    10,
+    11
+  ],
+  "saturated_channel_count": 3,
+  "max_throughput": 20,
+  "throughput_ledger_checksum": "3e36d8d7527a6c0e9fdd9e3554e5e6141b82c71977dc3c4274c281ad999c4d44",
   "edge_checksum": "a1bfa24fe8643ea9d2841f9d22ebf2f0ec08c741e3446617fbf9c30436d54c86",
-  "flux_checksum": "8310149a50d4df6273090f0346a91007ac4324cb96f0c3ac224e457e9e331796"
+  "flux_checksum": "745be15620ad083fd8f0d41f552a2941da59d8dc8547df118273f9616cba2c76"
 }

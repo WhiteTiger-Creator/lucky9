@@ -144,6 +144,34 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
     max_path_efficiency = max(path_efficiencies, default=0)
     mean_flux_floor = max_flux // flux_path_count if flux_path_count else 0
 
+    # Sequential throughput ledger over the routed channels in order. Carry
+    # propagates between consecutive channels and decays by a hop-based penalty;
+    # a channel is admitted to the saturated set when its throughput reaches the
+    # threshold. Order-dependent and boundary-sensitive: a slip in any floored
+    # term shifts a channel across the threshold and changes the set, the count
+    # and the ledger checksum. The decay/credit divisors, the threshold and the
+    # carry cap are governed by the calibration log.
+    SATURATION_THRESHOLD = 20
+    THROUGHPUT_CAP = 60
+    prev_out = 0
+    saturated_endpoints: list[int] = []
+    max_throughput = 0
+    tp_rows: list[str] = []
+    for seq in flux_paths:
+        hops = len(seq) - 1
+        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
+        carry_in = max(prev_out - (hops * 5) // 3, 0)
+        throughput = cflux + carry_in // 4
+        carry_out = min(carry_in + cflux - (hops // 2), THROUGHPUT_CAP)
+        if throughput >= SATURATION_THRESHOLD:
+            saturated_endpoints.append(seq[-1])
+        max_throughput = max(max_throughput, throughput)
+        tp_rows.append(f"{seq[-1]}|{throughput}|{1 if throughput >= SATURATION_THRESHOLD else 0}|{carry_out}")
+        prev_out = carry_out
+    saturated_endpoints = sorted(saturated_endpoints)
+    saturated_channel_count = len(saturated_endpoints)
+    throughput_ledger_checksum = hashlib.sha256("\n".join(tp_rows).encode("utf-8")).hexdigest()
+
     edge_payload = "\n".join(
         f"{s}|{t}|{edges[s][t]}" for s in sorted(edges) for t in sorted(edges[s])
     )
@@ -156,6 +184,8 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         f"{','.join(str(n) for n in reachable)}|"
         f"{flux_node_count}|{residual_flux}|"
         f"{total_path_efficiency}|{max_path_efficiency}|{mean_flux_floor}|"
+        f"{saturated_channel_count}|{max_throughput}|"
+        f"{','.join(str(n) for n in saturated_endpoints)}|"
         f"{flux_paths_payload}"
     )
     flux_checksum = hashlib.sha256(flux_payload.encode("utf-8")).hexdigest()
@@ -173,6 +203,10 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         "total_path_efficiency": total_path_efficiency,
         "max_path_efficiency": max_path_efficiency,
         "mean_flux_floor": mean_flux_floor,
+        "saturated_endpoints": saturated_endpoints,
+        "saturated_channel_count": saturated_channel_count,
+        "max_throughput": max_throughput,
+        "throughput_ledger_checksum": throughput_ledger_checksum,
         "edge_checksum": edge_checksum,
         "flux_checksum": flux_checksum,
     }

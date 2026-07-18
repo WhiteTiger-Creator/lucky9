@@ -82,6 +82,13 @@ Bench run logged nominal transport; no calibration-relevant findings for this la
 ### Review entry 0037 — efficiency bench
 > **Calibration decision (2026-05-13 - MX-2211)** Nadia: `mean_flux_floor` = `max_flux // flux_path_count` (integer floor division), and 0 when the routed set is empty. This supersedes MX-2120.
 
+### Review entry 0026b — throughput bench
+> **Model draft (2026-02-25 - MX-1922)** Sole: throughput ledger — process the routed channels in `flux_paths` order; carry_in = max(previous carry_out - (hops * 5) // 2, 0); throughput = channel_flux + carry_in // 3; carry_out = min(carry_in + channel_flux, 50); a channel is saturated when throughput >= 16. *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
+Bench run logged nominal transport; the decay/credit divisors were escalated to the 2026-05 cycle.
+
+### Review entry 0039 — throughput bench
+> **Calibration decision (2026-05-15 - MX-2213)** Nadia: throughput ledger (final) — process the routed channels in `flux_paths` order; carry starts at 0. For each channel: `hops` is its edge count and `channel_flux` its additive flux (per MX-2204); `carry_in = max(previous_carry_out - (hops * 5) // 3, 0)`; `throughput = channel_flux + carry_in // 4`; `carry_out = min(carry_in + channel_flux - (hops // 2), 60)`; a channel is admitted to the saturated set when `throughput >= 20`. `saturated_endpoints` are the terminal site ids of saturated channels, sorted ascending; `saturated_channel_count` is their number; `max_throughput` is the maximum throughput over the routed channels. The `*5`/`//3` decay, the `//4` credit, the 60 cap and the 20 threshold are final and revise MX-1922. This supersedes MX-1922.
+
 ### Review entry 0041 — audit bench
 Bench run logged nominal transport; quarterly recertification touched this lane, no estimator-relevant configuration changed.
 

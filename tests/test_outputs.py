@@ -89,6 +89,8 @@ def test_result_has_required_keys(result):
                            "flux_paths", "flux_path_count", "flux_node_count",
                            "residual_flux", "total_path_efficiency",
                            "max_path_efficiency", "mean_flux_floor",
+                           "saturated_endpoints", "saturated_channel_count",
+                           "max_throughput", "throughput_ledger_checksum",
                            "edge_checksum", "flux_checksum"}
 
 
@@ -123,9 +125,33 @@ def test_flux_checksum_consistent(result):
         f"{','.join(str(n) for n in result['reachable'])}|"
         f"{result['flux_node_count']}|{result['residual_flux']}|"
         f"{result['total_path_efficiency']}|{result['max_path_efficiency']}|"
-        f"{result['mean_flux_floor']}|{paths}"
+        f"{result['mean_flux_floor']}|"
+        f"{result['saturated_channel_count']}|{result['max_throughput']}|"
+        f"{','.join(str(n) for n in result['saturated_endpoints'])}|{paths}"
     )
     assert result["flux_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
+
+
+def test_throughput_ledger_consistent(result):
+    """The throughput ledger reproduces the log-governed carry/threshold rule."""
+    data = json.loads(DATA.read_text())
+    edges = _canonical_edges(data["edges"])
+    prev_out, sat, max_tp, rows = 0, [], 0, []
+    for seq in result["flux_paths"]:
+        hops = len(seq) - 1
+        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
+        carry_in = max(prev_out - (hops * 5) // 3, 0)
+        throughput = cflux + carry_in // 4
+        carry_out = min(carry_in + cflux - (hops // 2), 60)
+        if throughput >= 20:
+            sat.append(seq[-1])
+        max_tp = max(max_tp, throughput)
+        rows.append(f"{seq[-1]}|{throughput}|{1 if throughput >= 20 else 0}|{carry_out}")
+        prev_out = carry_out
+    assert result["saturated_endpoints"] == sorted(sat)
+    assert result["saturated_channel_count"] == len(sat)
+    assert result["max_throughput"] == max_tp
+    assert result["throughput_ledger_checksum"] == hashlib.sha256("\n".join(rows).encode()).hexdigest()
 
 
 def test_path_efficiency_consistent(result):
