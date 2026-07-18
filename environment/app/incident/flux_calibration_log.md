@@ -31,6 +31,10 @@ Thread archived; see the MX calibration entries for anything affecting estimator
 > **Model draft (2026-02-20 - MX-1917)** Iyer: when the objective admits more than one optimal channel set, report ANY one of them; the routed set need not be canonical. *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
 Bench run logged nominal transport; no calibration-relevant findings for this lane.
 
+### Review entry 0007 — flux bench
+> **Model draft (2026-02-23 - MX-1920)** Sole: a channel's flux is its bottleneck conductance — the MINIMUM edge weight along the channel (a series-conductance reading). *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
+Bench run logged nominal transport; the series-vs-additive question was escalated to the 2026-05 cycle.
+
 ## Calibration Review Archive (2025-Q4 through 2026-Q2)
 Routine entries are context only. MX-ticketed draft and decision quotes embedded in the entries are the authoritative record for estimator behavior.
 
@@ -59,6 +63,9 @@ Bench run logged nominal transport; no calibration-relevant findings for this la
 
 ### Review entry 0032 — span bench
 > **Calibration decision (2026-05-04 - MX-2202)** Ilya: transport channels are simple directed paths of one to FIVE links (inclusive) starting at the source (site 0); a simple path repeats no site. This supersedes MX-1908 and MX-2104.
+
+### Review entry 0032b — flux bench
+> **Calibration decision (2026-05-05 - MX-2204)** Ilya: a channel's flux is ADDITIVE — the SUM of the conductance weights of its constituent edges, accumulated along the channel from the source. It is not the bottleneck/minimum edge weight. Every flux-valued quantity (a channel's flux, `strongest_path_weight`, `max_flux`, and the routed channels' fluxes) uses this additive sum. This supersedes MX-1920.
 
 ### Review entry 0033 — objective bench
 > **Calibration decision (2026-05-06 - MX-2203)** Ilya: the sustained flux `max_flux` is the exact maximum total weight of a set of VERTEX-DISJOINT channels (channels sharing only the source). It is NOT the per-site sum of strongest channels (that over-counts shared sites) and NOT a greedy strongest-first value (greedy is not optimal). The empty set carries 0. This supersedes MX-1911 and MX-1914.
