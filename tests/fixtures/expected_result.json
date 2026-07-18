@@ -24,8 +24,8 @@
     1,
     2
   ],
-  "strongest_path_weight": 16,
-  "max_flux": 115,
+  "strongest_path_weight": 15,
+  "max_flux": 108,
   "flux_paths": [
     [
       0,
@@ -77,7 +77,10 @@
   ],
   "flux_path_count": 10,
   "flux_node_count": 17,
-  "residual_flux": 97,
-  "edge_checksum": "783892c4f1a6845439bf2e3822d69f3bb72f54c7fb06b617fb6ec9cd895f1bfe",
-  "flux_checksum": "9c45769dc864e4d3fd2fce7c4b166d412d6a32a0aae84966b920040cf200e215"
+  "residual_flux": 91,
+  "total_path_efficiency": 61,
+  "max_path_efficiency": 9,
+  "mean_flux_floor": 10,
+  "edge_checksum": "4131c25344d712cb66178db324609c9821954b04740adb40e6c14481e2ca35a1",
+  "flux_checksum": "f621ce0f559fc696cc7cc2bb7fd32ff56cab125b69d7bde83115dc7007cc1dc4"
 }

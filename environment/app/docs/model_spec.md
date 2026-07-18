@@ -91,12 +91,20 @@ exactly these keys:
 * `flux_node_count` — the number of distinct non-source sites used by the routed
   set.
 * `residual_flux` — the residual packing total defined above.
+* `total_path_efficiency` — sum over the routed channels of each channel's
+  **per-hop efficiency**, where a channel's efficiency is its flux **integer-divided
+  (floored)** by its hop count (number of edges): `channel_flux // hops`. Every
+  remainder is dropped.
+* `max_path_efficiency` — the maximum per-hop efficiency (`channel_flux // hops`)
+  over the routed channels (0 if none).
+* `mean_flux_floor` — `max_flux // flux_path_count` (integer floor division; 0 when
+  the routed set is empty).
 * `edge_checksum` — the SHA-256 hex digest of the conditioned links serialized as
   follows: for each `source` in ascending order, and each `target` of that source
   in ascending order, the line `source|target|weight`; lines joined by a single
   `\n`, no trailing newline; hash the UTF-8 encoding.
 * `flux_checksum` — the SHA-256 hex digest of the UTF-8 encoding of
-  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|P`
+  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|total_path_efficiency|max_path_efficiency|mean_flux_floor|P`
   where `S` is the `strongest_path` site ids joined by `>`, `R` is the
   `reachable` site ids joined by `,`, and `P` joins the `flux_paths` channels
   with `;`, each channel's site ids joined by `>`.

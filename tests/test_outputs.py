@@ -87,7 +87,9 @@ def test_result_has_required_keys(result):
     assert set(result) == {"node_count", "reachable", "strongest_path",
                            "strongest_path_weight", "max_flux",
                            "flux_paths", "flux_path_count", "flux_node_count",
-                           "residual_flux", "edge_checksum", "flux_checksum"}
+                           "residual_flux", "total_path_efficiency",
+                           "max_path_efficiency", "mean_flux_floor",
+                           "edge_checksum", "flux_checksum"}
 
 
 def test_matches_fixture(result):
@@ -119,9 +121,25 @@ def test_flux_checksum_consistent(result):
         f"{result['node_count']}|{result['max_flux']}|{result['strongest_path_weight']}|"
         f"{'>'.join(str(n) for n in result['strongest_path'])}|"
         f"{','.join(str(n) for n in result['reachable'])}|"
-        f"{result['flux_node_count']}|{result['residual_flux']}|{paths}"
+        f"{result['flux_node_count']}|{result['residual_flux']}|"
+        f"{result['total_path_efficiency']}|{result['max_path_efficiency']}|"
+        f"{result['mean_flux_floor']}|{paths}"
     )
     assert result["flux_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
+
+
+def test_path_efficiency_consistent(result):
+    """The efficiency aggregates are the floored per-hop efficiencies of the routed set."""
+    data = json.loads(DATA.read_text())
+    edges = _canonical_edges(data["edges"])
+    effs = []
+    for seq in result["flux_paths"]:
+        flux = sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
+        effs.append(flux // (len(seq) - 1))
+    assert result["total_path_efficiency"] == sum(effs)
+    assert result["max_path_efficiency"] == (max(effs) if effs else 0)
+    fpc = result["flux_path_count"]
+    assert result["mean_flux_floor"] == (result["max_flux"] // fpc if fpc else 0)
 
 
 def test_routed_set_is_valid_disjoint_optimal(result):

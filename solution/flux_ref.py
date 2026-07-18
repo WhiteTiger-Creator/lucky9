@@ -129,6 +129,21 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
     residual_items = [it for it in items if it[0] not in selected_node_sets]
     residual_flux, _ = _best_flux_packing(residual_items)
 
+    # Selection-dependent floor-division aggregates. Per routed channel, the
+    # per-hop efficiency is its flux divided by its hop count, ROUNDED DOWN
+    # (integer floor division); the totals below sum and max those floors. These
+    # depend on the exact tie-broken routed set, and each floor drops any
+    # remainder, so an off-by-one in a channel's flux, its hop count, or the
+    # routed set changes the result.
+    path_efficiencies = []
+    for seq in flux_paths:
+        channel_flux = sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
+        hops = len(seq) - 1
+        path_efficiencies.append(channel_flux // hops)
+    total_path_efficiency = sum(path_efficiencies)
+    max_path_efficiency = max(path_efficiencies, default=0)
+    mean_flux_floor = max_flux // flux_path_count if flux_path_count else 0
+
     edge_payload = "\n".join(
         f"{s}|{t}|{edges[s][t]}" for s in sorted(edges) for t in sorted(edges[s])
     )
@@ -139,7 +154,9 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         f"{node_count}|{max_flux}|{strongest_weight}|"
         f"{'>'.join(str(n) for n in strongest_seq)}|"
         f"{','.join(str(n) for n in reachable)}|"
-        f"{flux_node_count}|{residual_flux}|{flux_paths_payload}"
+        f"{flux_node_count}|{residual_flux}|"
+        f"{total_path_efficiency}|{max_path_efficiency}|{mean_flux_floor}|"
+        f"{flux_paths_payload}"
     )
     flux_checksum = hashlib.sha256(flux_payload.encode("utf-8")).hexdigest()
 
@@ -153,6 +170,9 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         "flux_path_count": flux_path_count,
         "flux_node_count": flux_node_count,
         "residual_flux": residual_flux,
+        "total_path_efficiency": total_path_efficiency,
+        "max_path_efficiency": max_path_efficiency,
+        "mean_flux_floor": mean_flux_floor,
         "edge_checksum": edge_checksum,
         "flux_checksum": flux_checksum,
     }
