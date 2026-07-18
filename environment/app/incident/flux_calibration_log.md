@@ -35,8 +35,68 @@ Bench run logged nominal transport; no calibration-relevant findings for this la
 > **Model draft (2026-02-23 - MX-1920)** Sole: a channel's flux is its bottleneck conductance — the MINIMUM edge weight along the channel (a series-conductance reading). *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
 Bench run logged nominal transport; the series-vs-additive question was escalated to the 2026-05 cycle.
 
+### Review entry 0008 — conditioning bench
+> **Model draft (2026-02-26 - MX-1925)** Rao: site conditioning — damping values are valid in the range 0..8; when a site is listed more than once, keep the FIRST occurrence and discard later repeats. *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
+Probe technicians noted the conditioning bench was recalibrated mid-run; the damping ledger was re-zeroed afterwards and the affected shift discarded.
+
+### Review entry 0009 — damping bench
+> **Model draft (2026-03-01 - MX-1928)** Sole: a channel's damped flux subtracts the accumulated site damping in FULL — `damped_flux = channel_flux - damping_sum`, floored at zero. *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
+The full-subtraction form drove several lattice channels to zero and was flagged by the transport group as unphysical for the sustained observable.
+
+### Review entry 0010 — dispatch bench
+> **Model draft (2026-03-04 - MX-1931)** Iyer: every routed channel is dispatched; there is no admission floor and no dispatch class. *(Superseded — reversed in the 2026-05 calibration; see the matching decision.)*
+Downstream consumers reported that undifferentiated dispatch made the transport ledger unusable for capacity planning.
+
 ## Calibration Review Archive (2025-Q4 through 2026-Q2)
 Routine entries are context only. MX-ticketed draft and decision quotes embedded in the entries are the authoritative record for estimator behavior.
+
+### Review entry 1003 — selection bench
+Iyer on shift. Recertification paperwork for the calibration lattice was renewed. No parameters changed and no estimator behaviour is implicated. Parameters remain as approved by the board.
+
+### Review entry 1010 — damping bench
+Lindqvist on shift. An external group asked for the raw sweep archive. The request was met with the published archive; the estimator configuration was not shared as it is unreleased. Bench run logged nominal transport for this lane.
+
+### Review entry 1017 — span bench
+Dana on shift. Two channels on the east lattice reported intermittent conductance; the harness was reterminated and the fault did not recur across a 12-hour soak. Filed for the recertification record; no calibration impact.
+
+### Review entry 1024 — throughput bench
+Halvorsen on shift. The lattice was re-levelled following the floor survey. Post-survey transport readings reproduced the pre-survey reference set. Referred to the tooling backlog; no model impact.
+
+### Review entry 1031 — lattice bench
+Marta on shift. Cryostat pressure drifted 0.4% over the shift. Transport readings were unaffected, but the shift log was annotated for the recertification file. Closed with no action required.
+
+### Review entry 1038 — residual bench
+Sole on shift. Network capture during the overnight sweep showed a retransmission burst on the acquisition link. Data integrity checks passed and the sweep was retained. No estimator semantics changed in this entry.
+
+### Review entry 1045 — audit bench
+Okafor on shift. A visiting reviewer noted the archive index was stale by one cycle. The index was rebuilt; no underlying records changed. Parameters remain as approved by the board.
+
+### Review entry 1052 — objective bench
+Priya on shift. A junior analyst's reconstruction disagreed with the reference by one unit; the discrepancy was traced to a stale local checkout, not the estimator. Bench run logged nominal transport for this lane.
+
+### Review entry 1059 — dispatch bench
+Baptiste on shift. A question was raised about whether retired draft parameterizations should be deleted from this log. The board elected to retain them in place, marked superseded. Filed for the recertification record; no calibration impact.
+
+### Review entry 1066 — conditioning bench
+Ilya on shift. A duplicated row in the shift handover sheet was traced to a copy-paste during the handover and corrected in the source spreadsheet. Referred to the tooling backlog; no model impact.
+
+### Review entry 1073 — efficiency bench
+Rao on shift. A reporting script was rewritten to stream rather than buffer the archive. Output bytes were verified identical against the previous implementation. Closed with no action required.
+
+### Review entry 1080 — probe bench
+Nadia on shift. An analyst asked whether the dashboards could show per-shift transport medians. The request was logged as a reporting feature, not a model change. No estimator semantics changed in this entry.
+
+### Review entry 1087 — selection bench
+Iyer on shift. Thermal cycling on the north bench produced a transient conductance step. The step did not persist and was attributed to a connector, since replaced. Parameters remain as approved by the board.
+
+### Review entry 1094 — damping bench
+Lindqvist on shift. The archive export job overran its window because of a slow storage mount. No estimator inputs were touched; the job was rescheduled off-peak. Bench run logged nominal transport for this lane.
+
+### Review entry 1101 — span bench
+Dana on shift. Quarterly access review completed for the calibration share. Two dormant accounts were removed; no configuration was altered. Filed for the recertification record; no calibration impact.
+
+### Review entry 1108 — throughput bench
+Halvorsen on shift. A vendor firmware note changed the sampling window default; the bench was pinned to the previous window and the change deferred to the next cycle. Referred to the tooling backlog; no model impact.
 
 ### Review entry 0021 — span bench
 > **Calibration decision (2026-04-08 - MX-2104)** Priya: transport channels are simple directed paths of at most FOUR links from the source. *(Revised — see the 2026-05 calibration.)*
@@ -57,6 +117,74 @@ Thread archived; see the MX calibration entries for anything affecting estimator
 ### Review entry 0025 — efficiency bench
 > **Calibration decision (2026-04-24 - MX-2120)** Dana: `mean_flux_floor` is the sustained flux divided by the routed channel count, rounded to the nearest integer. *(Revised — see the 2026-05 calibration.)*
 Bench run logged nominal transport; no calibration-relevant findings for this lane.
+
+### Review entry 0026 — conditioning bench
+> **Calibration decision (2026-04-26 - MX-2124)** Dana: site damping outside the valid range is CLAMPED into range (values above the maximum become the maximum) rather than discarded. *(Revised — see the 2026-05 calibration.)*
+Lattice recertification completed on the conditioning bench; no probe replacements were required this cycle.
+
+### Review entry 0027 — damping bench
+> **Calibration decision (2026-04-28 - MX-2128)** Dana: the accumulated site damping is HALVED with integer floor division before subtraction — `damped_flux = max(channel_flux - damping_sum // 2, 0)`. *(Revised — see the 2026-05 calibration.)*
+The halving was introduced to keep conditioned channels on-scale; the rounding direction was left open pending the 2026-05 cycle.
+
+### Review entry 0028 — dispatch bench
+> **Calibration decision (2026-04-30 - MX-2132)** Priya: the hop attenuation applied after damping is `hops * 2`. *(Revised — see the 2026-05 calibration.)*
+Bench comparison against the reference lattice showed the linear form over-attenuated long channels.
+
+### Review entry 0029 — dispatch bench
+> **Calibration decision (2026-05-01 - MX-2136)** Priya: dispatch admission floor is 5 on the conditioned flux, and dispatched channels carry one of TWO classes, `primary` and `secondary`. *(Revised — see the 2026-05 calibration.)*
+Capacity planning asked for a third tier to separate marginal channels; deferred to the mid-May cycle.
+
+### Review entry 0030 — dispatch bench
+> **Calibration decision (2026-05-02 - MX-2140)** Priya: dispatched channels are reported in ascending terminal-site order. *(Revised — see the 2026-05 calibration.)*
+Ordering by site id was convenient for the dashboards but carried no capacity semantics.
+
+### Review entry 1115 — lattice bench
+Marta on shift. A proposal to cache intermediate channel enumerations was reviewed. It changes runtime only and carries no estimator semantics; approved for the tooling backlog. Closed with no action required.
+
+### Review entry 1122 — residual bench
+Sole on shift. Probe A7 was re-seated after a warm-up excursion; the affected sweep was rerun and the replacement trace matched the reference lattice within tolerance. No estimator semantics changed in this entry.
+
+### Review entry 1129 — audit bench
+Okafor on shift. The spare probe inventory was audited. Two units were retired for drift and replaced from stores; calibration constants were re-derived for the new units. Parameters remain as approved by the board.
+
+### Review entry 1136 — objective bench
+Priya on shift. The acquisition host was patched during the maintenance window. Post-patch verification reproduced the reference sweep byte for byte. Bench run logged nominal transport for this lane.
+
+### Review entry 1143 — dispatch bench
+Baptiste on shift. Bench timing was resynchronised against the site clock after a leap-second advisory. Transport observables are not time-referenced and were unaffected. Filed for the recertification record; no calibration impact.
+
+### Review entry 1150 — conditioning bench
+Ilya on shift. Humidity control on the enclosure was serviced. The service window overlapped one sweep, which was discarded and repeated the following shift. Referred to the tooling backlog; no model impact.
+
+### Review entry 1157 — efficiency bench
+Rao on shift. Ambient magnetic shielding was re-measured after building works. Values remained inside the acceptance envelope for the transport bench. Closed with no action required.
+
+### Review entry 1164 — probe bench
+Nadia on shift. The shift rota changed to accommodate the recertification window. No bench parameters were touched during the transition. No estimator semantics changed in this entry.
+
+### Review entry 1171 — selection bench
+Iyer on shift. Recertification paperwork for the calibration lattice was renewed. No parameters changed and no estimator behaviour is implicated. Parameters remain as approved by the board.
+
+### Review entry 1178 — damping bench
+Lindqvist on shift. An external group asked for the raw sweep archive. The request was met with the published archive; the estimator configuration was not shared as it is unreleased. Bench run logged nominal transport for this lane.
+
+### Review entry 1185 — span bench
+Dana on shift. Two channels on the east lattice reported intermittent conductance; the harness was reterminated and the fault did not recur across a 12-hour soak. Filed for the recertification record; no calibration impact.
+
+### Review entry 1192 — throughput bench
+Halvorsen on shift. The lattice was re-levelled following the floor survey. Post-survey transport readings reproduced the pre-survey reference set. Referred to the tooling backlog; no model impact.
+
+### Review entry 1199 — lattice bench
+Marta on shift. Cryostat pressure drifted 0.4% over the shift. Transport readings were unaffected, but the shift log was annotated for the recertification file. Closed with no action required.
+
+### Review entry 1206 — residual bench
+Sole on shift. Network capture during the overnight sweep showed a retransmission burst on the acquisition link. Data integrity checks passed and the sweep was retained. No estimator semantics changed in this entry.
+
+### Review entry 1213 — audit bench
+Okafor on shift. A visiting reviewer noted the archive index was stale by one cycle. The index was rebuilt; no underlying records changed. Parameters remain as approved by the board.
+
+### Review entry 1220 — objective bench
+Priya on shift. A junior analyst's reconstruction disagreed with the reference by one unit; the discrepancy was traced to a stale local checkout, not the estimator. Bench run logged nominal transport for this lane.
 
 ### Review entry 0031 — conditioning bench
 > **Calibration decision (2026-05-03 - MX-2201)** Ilya: link conditioning — discard self-loops (source==target) and links whose weight is outside the inclusive range 1..9; when a directed link (source,target) repeats, collapse the duplicates keeping the MAXIMUM weight. This supersedes MX-1902 and MX-1905.
@@ -88,6 +216,69 @@ Bench run logged nominal transport; the decay/credit divisors were escalated to 
 
 ### Review entry 0039 — throughput bench
 > **Calibration decision (2026-05-15 - MX-2213)** Nadia: throughput ledger (final) — process the routed channels in `flux_paths` order; carry starts at 0. For each channel: `hops` is its edge count and `channel_flux` its additive flux (per MX-2204); `carry_in = max(previous_carry_out - (hops * 5) // 3, 0)`; `throughput = channel_flux + carry_in // 4`; `carry_out = min(carry_in + channel_flux - (hops // 2), 60)`; a channel is admitted to the saturated set when `throughput >= 20`. `saturated_endpoints` are the terminal site ids of saturated channels, sorted ascending; `saturated_channel_count` is their number; `max_throughput` is the maximum throughput over the routed channels. The `*5`/`//3` decay, the `//4` credit, the 60 cap and the 20 threshold are final and revise MX-1922. This supersedes MX-1922.
+
+### Review entry 1227 — dispatch bench
+Baptiste on shift. A question was raised about whether retired draft parameterizations should be deleted from this log. The board elected to retain them in place, marked superseded. Filed for the recertification record; no calibration impact.
+
+### Review entry 1234 — conditioning bench
+Ilya on shift. A duplicated row in the shift handover sheet was traced to a copy-paste during the handover and corrected in the source spreadsheet. Referred to the tooling backlog; no model impact.
+
+### Review entry 1241 — efficiency bench
+Rao on shift. A reporting script was rewritten to stream rather than buffer the archive. Output bytes were verified identical against the previous implementation. Closed with no action required.
+
+### Review entry 1248 — probe bench
+Nadia on shift. An analyst asked whether the dashboards could show per-shift transport medians. The request was logged as a reporting feature, not a model change. No estimator semantics changed in this entry.
+
+### Review entry 1255 — selection bench
+Iyer on shift. Thermal cycling on the north bench produced a transient conductance step. The step did not persist and was attributed to a connector, since replaced. Parameters remain as approved by the board.
+
+### Review entry 1262 — damping bench
+Lindqvist on shift. The archive export job overran its window because of a slow storage mount. No estimator inputs were touched; the job was rescheduled off-peak. Bench run logged nominal transport for this lane.
+
+### Review entry 1269 — span bench
+Dana on shift. Quarterly access review completed for the calibration share. Two dormant accounts were removed; no configuration was altered. Filed for the recertification record; no calibration impact.
+
+### Review entry 1276 — throughput bench
+Halvorsen on shift. A vendor firmware note changed the sampling window default; the bench was pinned to the previous window and the change deferred to the next cycle. Referred to the tooling backlog; no model impact.
+
+### Review entry 1283 — lattice bench
+Marta on shift. A proposal to cache intermediate channel enumerations was reviewed. It changes runtime only and carries no estimator semantics; approved for the tooling backlog. Closed with no action required.
+
+### Review entry 1290 — residual bench
+Sole on shift. Probe A7 was re-seated after a warm-up excursion; the affected sweep was rerun and the replacement trace matched the reference lattice within tolerance. No estimator semantics changed in this entry.
+
+### Review entry 1297 — audit bench
+Okafor on shift. The spare probe inventory was audited. Two units were retired for drift and replaced from stores; calibration constants were re-derived for the new units. Parameters remain as approved by the board.
+
+### Review entry 1304 — objective bench
+Priya on shift. The acquisition host was patched during the maintenance window. Post-patch verification reproduced the reference sweep byte for byte. Bench run logged nominal transport for this lane.
+
+### Review entry 1311 — dispatch bench
+Baptiste on shift. Bench timing was resynchronised against the site clock after a leap-second advisory. Transport observables are not time-referenced and were unaffected. Filed for the recertification record; no calibration impact.
+
+### Review entry 1318 — conditioning bench
+Ilya on shift. Humidity control on the enclosure was serviced. The service window overlapped one sweep, which was discarded and repeated the following shift. Referred to the tooling backlog; no model impact.
+
+### Review entry 1325 — efficiency bench
+Rao on shift. Ambient magnetic shielding was re-measured after building works. Values remained inside the acceptance envelope for the transport bench. Closed with no action required.
+
+### Review entry 1332 — probe bench
+Nadia on shift. The shift rota changed to accommodate the recertification window. No bench parameters were touched during the transition. No estimator semantics changed in this entry.
+
+### Review entry 0043 — conditioning bench
+> **Calibration decision (2026-05-16 - MX-2215)** Nadia: site conditioning (final) — site damping is read from `/app/data/site_conditioning.json`, an object with a `sites` list of `{site, damping}` entries. This path is FIXED and absolute: `--input` selects the network only and never relocates the conditioning file. Coerce `site` and `damping` to int; DISCARD any entry whose damping falls outside the inclusive range 0..12 (do not clamp it into range); when a site is listed more than once, collapse the repeats keeping the MAXIMUM damping. A site absent from the file damps by 0. This supersedes MX-1925 and MX-2124.
+
+### Review entry 0044 — damping bench
+> **Calibration decision (2026-05-17 - MX-2217)** Nadia: channel damping (final) — a routed channel accumulates `damping_sum`, the total damping of the non-source sites it visits (the source site never contributes). Its damped flux is `damped_flux = max(channel_flux - ceil(damping_sum / 2), 0)`: the accumulated damping is halved and ROUNDED UP (ceiling), so an odd damping sum costs one more unit than a floored halving would. Written in integer arithmetic, `ceil(x / 2)` is `-(-x // 2)`. This revises the floor form in MX-2128 and supersedes MX-1928.
+
+### Review entry 0045 — dispatch bench
+> **Calibration decision (2026-05-18 - MX-2219)** Ilya: hop attenuation (final) — after damping, a channel is further attenuated by `(hops * 3) // 2`, integer floor division, and the result floors at zero: `conditioned_flux = max(damped_flux - (hops * 3) // 2, 0)`. Note the asymmetry with MX-2217 deliberately: the damping half rounds UP, this hop term rounds DOWN. This supersedes MX-2132.
+
+### Review entry 0046 — dispatch bench
+> **Calibration decision (2026-05-20 - MX-2221)** Ilya: dispatch admission and class (final) — a routed channel is dispatched when `conditioned_flux >= 7`. Dispatched channels carry exactly one of THREE classes, evaluated in clause order, the first match fixing the class: `primary` when `conditioned_flux >= 8` with `damping_sum <= 7`, or when the channel is saturated (per the MX-2213 ledger) with `hops <= 1`; otherwise `secondary` when the channel is saturated, or `damped_flux >= 12`; otherwise `tertiary`. `dispatched_endpoints` are the terminal sites of dispatched channels, sorted ascending. This supersedes MX-1931 and MX-2136.
+
+### Review entry 0047 — dispatch bench
+> **Calibration decision (2026-05-21 - MX-2223)** Marta: dispatch reporting (final) — `class_counts` always enumerates ALL THREE class names in the order `primary`, `secondary`, `tertiary`, emitting 0 for a class with no dispatched channels. `dispatch_order` lists the terminal sites of the dispatched channels ordered strictly in this sequence: class rank `primary` > `secondary` > `tertiary`; then `conditioned_flux` descending; then `damped_flux` descending; then `channel_flux` descending; then `throughput` descending; then `hops` ascending; then terminal site ascending. `total_conditioned_flux` sums `conditioned_flux` over the dispatched channels and `max_conditioned_flux` is the largest (0 when none are dispatched); `total_damping` sums `damping_sum` over ALL routed channels, dispatched or not. This supersedes MX-2140.
 
 ### Review entry 0041 — audit bench
 Bench run logged nominal transport; quarterly recertification touched this lane, no estimator-relevant configuration changed.

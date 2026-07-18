@@ -93,6 +93,32 @@
   "saturated_channel_count": 7,
   "max_throughput": 23,
   "throughput_ledger_checksum": "c5eda16b3782825148649368fb405cc3306ec7fb200da898d077299933bb4ccb",
+  "total_damping": 29,
+  "dispatched_endpoints": [
+    2,
+    4,
+    6,
+    8,
+    10,
+    17
+  ],
+  "dispatched_channel_count": 6,
+  "total_conditioned_flux": 44,
+  "max_conditioned_flux": 8,
+  "class_counts": {
+    "primary": 3,
+    "secondary": 2,
+    "tertiary": 1
+  },
+  "dispatch_order": [
+    2,
+    6,
+    17,
+    8,
+    10,
+    4
+  ],
+  "dispatch_checksum": "f7e957cfb4eb6bf226b1eb2643d2d2ce5fbca23a1fa0a5711f21e46f309d7b09",
   "edge_checksum": "4131c25344d712cb66178db324609c9821954b04740adb40e6c14481e2ca35a1",
-  "flux_checksum": "4ee4e9b9b915f2b99619d5015b55dd3dcbf0c7bf53cef031bc32eccaa0a60514"
+  "flux_checksum": "91c90ca4c6d466658770452eb82902abd49a82b9be26f78106ea593c8c864e4d"
 }

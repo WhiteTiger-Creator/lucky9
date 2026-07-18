@@ -91,6 +91,10 @@ def test_result_has_required_keys(result):
                            "max_path_efficiency", "mean_flux_floor",
                            "saturated_endpoints", "saturated_channel_count",
                            "max_throughput", "throughput_ledger_checksum",
+                           "total_damping", "dispatched_endpoints",
+                           "dispatched_channel_count", "total_conditioned_flux",
+                           "max_conditioned_flux", "class_counts",
+                           "dispatch_order", "dispatch_checksum",
                            "edge_checksum", "flux_checksum"}
 
 
@@ -127,7 +131,10 @@ def test_flux_checksum_consistent(result):
         f"{result['total_path_efficiency']}|{result['max_path_efficiency']}|"
         f"{result['mean_flux_floor']}|"
         f"{result['saturated_channel_count']}|{result['max_throughput']}|"
-        f"{','.join(str(n) for n in result['saturated_endpoints'])}|{paths}"
+        f"{','.join(str(n) for n in result['saturated_endpoints'])}|"
+        f"{result['total_damping']}|{result['total_conditioned_flux']}|"
+        f"{result['max_conditioned_flux']}|{result['dispatched_channel_count']}|"
+        f"{','.join(str(n) for n in result['dispatch_order'])}|{paths}"
     )
     assert result["flux_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
 
@@ -220,3 +227,149 @@ def test_source_does_not_reference_verifier_trees():
     src = APP.read_text()
     for token in ("/tests", "/solution", "expected_result.json", "alt_expected.json"):
         assert token not in src
+
+
+# --- site conditioning / dispatch layer -------------------------------------
+
+CONDITIONING = Path("/app/data/site_conditioning.json")
+CLASS_ORDER = ("primary", "secondary", "tertiary")
+CLASS_RANK = {n: len(CLASS_ORDER) - i for i, n in enumerate(CLASS_ORDER)}
+DISPATCH_FLOOR = 7
+
+
+def _canonical_damping():
+    """MX-2215: discard damping outside 0..12, collapse repeats keeping MAXIMUM."""
+    rows = json.loads(CONDITIONING.read_text())["sites"]
+    out = {}
+    for row in rows:
+        site, value = int(row["site"]), int(row["damping"])
+        if value < 0 or value > 12:
+            continue
+        if site not in out or value > out[site]:
+            out[site] = value
+    return out
+
+
+def _dispatch_layer(result):
+    """Recompute the damping/dispatch layer independently from the routed set."""
+    edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
+    damping = _canonical_damping()
+    prev_out, channels = 0, []
+    for seq in result["flux_paths"]:
+        hops = len(seq) - 1
+        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
+        carry_in = max(prev_out - (hops * 5) // 3, 0)
+        throughput = cflux + carry_in // 4
+        prev_out = min(carry_in + cflux - (hops // 2), 60)
+        dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
+        damped = max(cflux - (-(-dsum // 2)), 0)          # ceil(dsum/2)
+        conditioned = max(damped - (hops * 3) // 2, 0)     # floored hop term
+        channels.append({
+            "endpoint": seq[-1], "hops": hops, "channel_flux": cflux,
+            "throughput": throughput, "saturated": throughput >= 20,
+            "damping_sum": dsum, "damped_flux": damped,
+            "conditioned_flux": conditioned,
+        })
+    dispatched = [c for c in channels if c["conditioned_flux"] >= DISPATCH_FLOOR]
+    for c in dispatched:
+        if (c["conditioned_flux"] >= 8 and c["damping_sum"] <= 7) or (c["saturated"] and c["hops"] <= 1):
+            c["dispatch_class"] = "primary"
+        elif c["saturated"] or c["damped_flux"] >= 12:
+            c["dispatch_class"] = "secondary"
+        else:
+            c["dispatch_class"] = "tertiary"
+    ordered = sorted(dispatched, key=lambda c: (
+        -CLASS_RANK[c["dispatch_class"]], -c["conditioned_flux"], -c["damped_flux"],
+        -c["channel_flux"], -c["throughput"], c["hops"], c["endpoint"]))
+    return channels, dispatched, ordered
+
+
+def test_conditioning_canonicalization_discards_and_collapses():
+    """Out-of-range damping is discarded (not clamped) and repeated sites collapse by MAXIMUM."""
+    raw = json.loads(CONDITIONING.read_text())["sites"]
+    damping = _canonical_damping()
+    for row in raw:
+        if int(row["damping"]) > 12 or int(row["damping"]) < 0:
+            # a clamping implementation would have recorded the bound instead
+            assert damping.get(int(row["site"])) != 12
+    seen = {}
+    for row in raw:
+        s_, v = int(row["site"]), int(row["damping"])
+        if 0 <= v <= 12:
+            seen.setdefault(s_, []).append(v)
+    for site, values in seen.items():
+        if len(values) > 1:
+            assert damping[site] == max(values)
+
+
+def test_dispatch_admission_matches_independent_computation(result):
+    """The dispatched set is exactly the routed channels whose conditioned flux clears the floor."""
+    _, dispatched, _ = _dispatch_layer(result)
+    assert result["dispatched_endpoints"] == sorted(c["endpoint"] for c in dispatched)
+    assert result["dispatched_channel_count"] == len(dispatched)
+    assert result["total_conditioned_flux"] == sum(c["conditioned_flux"] for c in dispatched)
+    assert result["max_conditioned_flux"] == max((c["conditioned_flux"] for c in dispatched), default=0)
+
+
+def test_damping_half_rounds_up_not_down(result):
+    """The accumulated damping is halved with a CEILING; a floored halving gives a different set."""
+    edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
+    damping = _canonical_damping()
+    floored = []
+    for seq in result["flux_paths"]:
+        hops = len(seq) - 1
+        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
+        dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
+        cond = max(max(cflux - (dsum // 2), 0) - (hops * 3) // 2, 0)
+        if cond >= DISPATCH_FLOOR:
+            floored.append(seq[-1])
+    # The shipped network is tuned so the two roundings genuinely disagree.
+    assert sorted(floored) != result["dispatched_endpoints"]
+
+
+def test_total_damping_covers_all_routed_channels(result):
+    """total_damping sums damping over every routed channel, not only the dispatched ones."""
+    channels, dispatched, _ = _dispatch_layer(result)
+    assert result["total_damping"] == sum(c["damping_sum"] for c in channels)
+    assert result["total_damping"] != sum(c["damping_sum"] for c in dispatched)
+
+
+def test_class_counts_enumerate_all_three(result):
+    """class_counts always carries all three class names in order, zero-filled."""
+    assert list(result["class_counts"]) == list(CLASS_ORDER)
+    _, dispatched, _ = _dispatch_layer(result)
+    expected = {n: 0 for n in CLASS_ORDER}
+    for c in dispatched:
+        expected[c["dispatch_class"]] += 1
+    assert result["class_counts"] == expected
+    assert sum(result["class_counts"].values()) == result["dispatched_channel_count"]
+
+
+def test_dispatch_order_follows_the_ordering_chain(result):
+    """dispatch_order applies the full tie-break chain and is not merely ascending."""
+    _, _, ordered = _dispatch_layer(result)
+    assert result["dispatch_order"] == [c["endpoint"] for c in ordered]
+    assert result["dispatch_order"] != sorted(result["dispatch_order"])
+    assert sorted(result["dispatch_order"]) == result["dispatched_endpoints"]
+
+
+def test_dispatch_checksum_consistent(result):
+    """dispatch_checksum is the SHA-256 of the dispatch-row serialization."""
+    _, _, ordered = _dispatch_layer(result)
+    payload = "\n".join(
+        f"{c['endpoint']}|{c['dispatch_class']}|{c['conditioned_flux']}|"
+        f"{c['damped_flux']}|{c['damping_sum']}" for c in ordered)
+    assert result["dispatch_checksum"] == hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def test_conditioning_path_is_fixed_not_relative_to_input(tmp_path):
+    """--input selects the network only; the conditioning file is never relocated."""
+    alt = FIX / "alt_network.json"
+    staged = tmp_path / "network.json"
+    staged.write_text(alt.read_text())
+    # A decoy conditioning file beside the staged input must be ignored.
+    (tmp_path / "site_conditioning.json").write_text(
+        json.dumps({"sites": [{"site": n, "damping": 12} for n in range(1, 18)]}))
+    got = _run(tmp_path / "run", input_path=staged)
+    alt_expected = json.loads((FIX / "alt_expected.json").read_text())
+    assert got == alt_expected

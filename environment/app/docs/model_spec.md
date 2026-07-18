@@ -4,8 +4,9 @@ This document is the **output contract only**: it fixes the network input shape,
 the exact `result.json` key set, and the byte-level checksum serialization. It
 does **not** define how the values are derived. Link conditioning and validity
 bounds, the channel span bound, the sustained-flux objective, the tie-broken
-routed channel set, the residual packing, and the per-hop efficiency aggregates
-are settled in `/app/incident/flux_calibration_log.md`; reconcile the governing
+routed channel set, the residual packing, the per-hop efficiency aggregates, the
+site-conditioning and damping rules, and the dispatch admission, class and
+ordering layers are settled in `/app/incident/flux_calibration_log.md`; reconcile the governing
 (latest) calibration decision for each rule there.
 
 ## Network state
@@ -21,6 +22,21 @@ directed link `source -> target` carrying an integer conductance `weight`. How
 the link list is conditioned (self-loops, weight bounds, duplicate handling), the
 channel span bound, and every derived observable are governed by the calibration
 log, not by this contract.
+
+## Site conditioning state
+
+Site conditioning is read from `/app/data/site_conditioning.json`, an object of the
+shape:
+
+```json
+{ "sites": [ {"site": S, "damping": D}, ... ] }
+```
+
+This path is **fixed and absolute**. `--input` selects the network only; it never
+relocates the conditioning file. How entries are validated, how repeated sites are
+collapsed, and how damping enters the observables are governed by the calibration
+log, not by this contract.
+
 
 ## Output
 
@@ -53,13 +69,33 @@ log; this contract fixes only the key set and the serializations below.
   `endpoint|throughput|c|carry_out` where `endpoint` is the channel's terminal site,
   and `c` is `1` if the channel is saturated else `0`; lines joined by a single `\n`,
   no trailing newline; hash the UTF-8 encoding (throughput/flag/carry_out per the log).
+* `total_damping` — the summed site damping accumulated over **all** routed channels
+  (per the log; dispatched or not).
+* `dispatched_endpoints` — a JSON **array** of the terminal site ids (ascending) of the
+  routed channels admitted by the dispatch floor (per the log).
+* `dispatched_channel_count` — the number of ids in `dispatched_endpoints`.
+* `total_conditioned_flux` — sum of conditioned flux over the dispatched channels (per log).
+* `max_conditioned_flux` — the largest conditioned flux over the dispatched channels,
+  `0` when none are dispatched (per log).
+* `class_counts` — a JSON **object** whose keys are exactly the three class names
+  `primary`, `secondary`, `tertiary`, in that order, mapping to the number of dispatched
+  channels in each class. All three keys are always present, emitting `0` for a class
+  with no dispatched channels. These three lowercase strings are the only accepted class
+  labels; which class a channel earns is governed by the calibration log.
+* `dispatch_order` — a JSON **array** of the dispatched channels' terminal site ids in the
+  log's dispatch ordering (this is an ordering, **not** sorted ascending; contrast
+  `dispatched_endpoints`, which is sorted).
+* `dispatch_checksum` — the SHA-256 hex digest of the dispatch rows serialized as
+  follows: for each dispatched channel in `dispatch_order` order, the line
+  `endpoint|class|conditioned_flux|damped_flux|damping_sum`; lines joined by a single
+  `\n`, no trailing newline; hash the UTF-8 encoding (each value per the log).
 * `edge_checksum` — the SHA-256 hex digest of the conditioned links serialized as
   follows: for each `source` in ascending order, and each `target` of that source
   in ascending order, the line `source|target|weight`; lines joined by a single
   `\n`, no trailing newline; hash the UTF-8 encoding.
 * `flux_checksum` — the SHA-256 hex digest of the UTF-8 encoding of
-  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|total_path_efficiency|max_path_efficiency|mean_flux_floor|saturated_channel_count|max_throughput|SE|P`
-  where `SE` is `saturated_endpoints` comma-joined ascending, `S` is the `strongest_path` site ids joined by `>`, `R` is the
+  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|total_path_efficiency|max_path_efficiency|mean_flux_floor|saturated_channel_count|max_throughput|SE|total_damping|total_conditioned_flux|max_conditioned_flux|dispatched_channel_count|DO|P`
+  where `SE` is `saturated_endpoints` comma-joined ascending, `DO` is `dispatch_order` comma-joined in dispatch order, `S` is the `strongest_path` site ids joined by `>`, `R` is the
   `reachable` site ids joined by `,`, and `P` joins the `flux_paths` channels
   with `;`, each channel's site ids joined by `>`.
 

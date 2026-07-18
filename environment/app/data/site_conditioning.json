@@ -1,0 +1,60 @@
+{
+  "sites": [
+    {
+      "site": 1,
+      "damping": 4
+    },
+    {
+      "site": 2,
+      "damping": 3
+    },
+    {
+      "site": 3,
+      "damping": 2
+    },
+    {
+      "site": 4,
+      "damping": 4
+    },
+    {
+      "site": 5,
+      "damping": 2
+    },
+    {
+      "site": 6,
+      "damping": 1
+    },
+    {
+      "site": 7,
+      "damping": 3
+    },
+    {
+      "site": 8,
+      "damping": 2
+    },
+    {
+      "site": 9,
+      "damping": 1
+    },
+    {
+      "site": 11,
+      "damping": 1
+    },
+    {
+      "site": 12,
+      "damping": 2
+    },
+    {
+      "site": 17,
+      "damping": 1
+    },
+    {
+      "site": 6,
+      "damping": 14
+    },
+    {
+      "site": 3,
+      "damping": 5
+    }
+  ]
+}

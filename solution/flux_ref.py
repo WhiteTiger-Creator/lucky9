@@ -3,11 +3,11 @@
 
 Given a directed weighted flux network, compute the maximum total flux that can
 be routed out of the source along node-disjoint simple directed paths, the
-tie-broken set of channels that realizes it, several routing aggregates, and
-integrity checksums. See /app/docs/model_spec.md for the authoritative
-contract. This is NOT the sum of each reachable node's strongest path — pathways
-that reuse a node cannot both be routed, so the routed flux is the best
-node-disjoint packing.
+tie-broken set of channels that realizes it, the site-conditioning and dispatch
+layers applied to that set, several routing aggregates, and integrity
+checksums. See /app/docs/model_spec.md for the authoritative contract. This is
+NOT the sum of each reachable node's strongest path — pathways that reuse a node
+cannot both be routed, so the routed flux is the best node-disjoint packing.
 """
 
 from __future__ import annotations
@@ -22,6 +22,13 @@ HOP_BOUND = 5
 WEIGHT_MIN = 1
 WEIGHT_MAX = 9
 
+CONDITIONING_PATH = Path("/app/data/site_conditioning.json")
+DAMPING_MIN = 0
+DAMPING_MAX = 12
+DISPATCH_FLOOR = 7
+CLASS_ORDER = ["primary", "secondary", "tertiary"]
+CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDER)}
+
 
 def canonical_edges(edge_rows: list[list[int]]) -> dict[int, dict[int, int]]:
     """Normalize edges: drop self-loops and weights outside 1..9, collapse
@@ -35,6 +42,32 @@ def canonical_edges(edge_rows: list[list[int]]) -> dict[int, dict[int, int]]:
         if cur is None or w > cur:
             edges.setdefault(s, {})[t] = w
     return edges
+
+
+def canonical_damping(rows: list[dict]) -> dict[int, int]:
+    """Normalize site conditioning per MX-2215: coerce to int, discard damping
+    outside the inclusive range 0..12, and collapse repeated site entries
+    keeping the MAXIMUM damping. Sites absent from the file damp by 0."""
+    out: dict[int, int] = {}
+    for row in rows:
+        try:
+            site = int(str(row.get("site", "")).strip())
+            value = int(str(row.get("damping", "")).strip())
+        except (TypeError, ValueError):
+            continue
+        if value < DAMPING_MIN or value > DAMPING_MAX:
+            continue
+        cur = out.get(site)
+        if cur is None or value > cur:
+            out[site] = value
+    return out
+
+
+def load_conditioning(path: Path = CONDITIONING_PATH) -> dict[int, int]:
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    return canonical_damping(payload.get("sites", []))
 
 
 def _simple_paths(edges: dict[int, dict[int, int]]) -> list[tuple[int, tuple[int, ...]]]:
@@ -102,9 +135,10 @@ def _best_flux_packing(
     return best_total, [list(s) for s in best_sel]
 
 
-def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
+def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, int] | None = None) -> dict:
     edges = canonical_edges(edge_rows)
     paths = _simple_paths(edges)
+    damping = damping or {}
 
     reachable = sorted({seq[-1] for _, seq in paths})
 
@@ -157,20 +191,97 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
     saturated_endpoints: list[int] = []
     max_throughput = 0
     tp_rows: list[str] = []
+    channels: list[dict] = []
     for seq in flux_paths:
         hops = len(seq) - 1
         cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
         carry_in = max(prev_out - (hops * 5) // 3, 0)
         throughput = cflux + carry_in // 4
         carry_out = min(carry_in + cflux - (hops // 2), THROUGHPUT_CAP)
-        if throughput >= SATURATION_THRESHOLD:
+        saturated = throughput >= SATURATION_THRESHOLD
+        if saturated:
             saturated_endpoints.append(seq[-1])
         max_throughput = max(max_throughput, throughput)
-        tp_rows.append(f"{seq[-1]}|{throughput}|{1 if throughput >= SATURATION_THRESHOLD else 0}|{carry_out}")
+        tp_rows.append(f"{seq[-1]}|{throughput}|{1 if saturated else 0}|{carry_out}")
+        channels.append(
+            {
+                "seq": seq,
+                "endpoint": seq[-1],
+                "hops": hops,
+                "channel_flux": cflux,
+                "throughput": throughput,
+                "saturated": saturated,
+            }
+        )
         prev_out = carry_out
     saturated_endpoints = sorted(saturated_endpoints)
     saturated_channel_count = len(saturated_endpoints)
     throughput_ledger_checksum = hashlib.sha256("\n".join(tp_rows).encode("utf-8")).hexdigest()
+
+    # Site conditioning and dispatch admission. Each routed channel accumulates
+    # the damping of the non-source sites it visits; that accumulated damping is
+    # HALVED AND ROUNDED UP (ceil) before being subtracted, per MX-2217 final,
+    # whereas the hop attenuation that follows it is floored. ceil(x/2) is
+    # written -(-x // 2). Both subtractions clamp at zero. The dispatch floor is
+    # tuned close to the conditioned-flux distribution, so a one-unit slip in a
+    # damping sum, a ceil read as a floor, or a wrong routed set moves channels
+    # across the boundary and changes the dispatched set, the class counts, the
+    # dispatch order and the dispatch checksum together.
+    total_damping = 0
+    for ch in channels:
+        damping_sum = sum(damping.get(n, 0) for n in ch["seq"] if n != SOURCE)
+        damped_flux = max(ch["channel_flux"] - (-(-damping_sum // 2)), 0)
+        conditioned_flux = max(damped_flux - (ch["hops"] * 3) // 2, 0)
+        ch["damping_sum"] = damping_sum
+        ch["damped_flux"] = damped_flux
+        ch["conditioned_flux"] = conditioned_flux
+        total_damping += damping_sum
+
+    dispatched = [ch for ch in channels if ch["conditioned_flux"] >= DISPATCH_FLOOR]
+
+    # Dispatch class per MX-2221 final. Clauses are evaluated in order; the
+    # first matching clause fixes the class.
+    for ch in dispatched:
+        if (
+            (ch["conditioned_flux"] >= 8 and ch["damping_sum"] <= 7)
+            or (ch["saturated"] and ch["hops"] <= 1)
+        ):
+            ch["dispatch_class"] = "primary"
+        elif ch["saturated"] or ch["damped_flux"] >= 12:
+            ch["dispatch_class"] = "secondary"
+        else:
+            ch["dispatch_class"] = "tertiary"
+
+    class_counts = {name: 0 for name in CLASS_ORDER}
+    for ch in dispatched:
+        class_counts[ch["dispatch_class"]] += 1
+
+    # Dispatch ordering per MX-2223 final, applied strictly in sequence.
+    ordered_dispatch = sorted(
+        dispatched,
+        key=lambda ch: (
+            -CLASS_RANK[ch["dispatch_class"]],
+            -ch["conditioned_flux"],
+            -ch["damped_flux"],
+            -ch["channel_flux"],
+            -ch["throughput"],
+            ch["hops"],
+            ch["endpoint"],
+        ),
+    )
+
+    dispatch_order = [ch["endpoint"] for ch in ordered_dispatch]
+    dispatched_endpoints = sorted(ch["endpoint"] for ch in dispatched)
+    dispatched_channel_count = len(dispatched)
+    total_conditioned_flux = sum(ch["conditioned_flux"] for ch in dispatched)
+    max_conditioned_flux = max((ch["conditioned_flux"] for ch in dispatched), default=0)
+
+    dispatch_rows = [
+        f"{ch['endpoint']}|{ch['dispatch_class']}|{ch['conditioned_flux']}|"
+        f"{ch['damped_flux']}|{ch['damping_sum']}"
+        for ch in ordered_dispatch
+    ]
+    dispatch_checksum = hashlib.sha256("\n".join(dispatch_rows).encode("utf-8")).hexdigest()
 
     edge_payload = "\n".join(
         f"{s}|{t}|{edges[s][t]}" for s in sorted(edges) for t in sorted(edges[s])
@@ -186,6 +297,9 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         f"{total_path_efficiency}|{max_path_efficiency}|{mean_flux_floor}|"
         f"{saturated_channel_count}|{max_throughput}|"
         f"{','.join(str(n) for n in saturated_endpoints)}|"
+        f"{total_damping}|{total_conditioned_flux}|{max_conditioned_flux}|"
+        f"{dispatched_channel_count}|"
+        f"{','.join(str(n) for n in dispatch_order)}|"
         f"{flux_paths_payload}"
     )
     flux_checksum = hashlib.sha256(flux_payload.encode("utf-8")).hexdigest()
@@ -207,6 +321,14 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         "saturated_channel_count": saturated_channel_count,
         "max_throughput": max_throughput,
         "throughput_ledger_checksum": throughput_ledger_checksum,
+        "total_damping": total_damping,
+        "dispatched_endpoints": dispatched_endpoints,
+        "dispatched_channel_count": dispatched_channel_count,
+        "total_conditioned_flux": total_conditioned_flux,
+        "max_conditioned_flux": max_conditioned_flux,
+        "class_counts": class_counts,
+        "dispatch_order": dispatch_order,
+        "dispatch_checksum": dispatch_checksum,
         "edge_checksum": edge_checksum,
         "flux_checksum": flux_checksum,
     }
@@ -218,7 +340,8 @@ def main() -> int:
     parser.add_argument("--output-dir", default="/app/output")
     args = parser.parse_args()
     data = json.loads(Path(args.input).read_text())
-    result = route_flux(data["node_count"], data["edges"])
+    damping = load_conditioning()
+    result = route_flux(data["node_count"], data["edges"], damping)
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "result.json").write_text(json.dumps(result, indent=2) + "\n")

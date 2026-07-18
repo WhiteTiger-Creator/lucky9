@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Meridian-2 network transport computation.
 
-Skeleton only. The network format, the conditioning rules, the transport-channel
-definition and span bound, the sustained-flux observable (max_flux, the maximum
-flux over vertex-disjoint transport channels — NOT the per-site sum of strongest
-channels and NOT a greedy value), and the exact result.json keys and checksum
-serialization are all specified in /app/docs/model_spec.md. Fill in `route_flux`
-to evaluate the transport and record the observables.
+Skeleton only. The network format, the site-conditioning input, the conditioning
+rules, the transport-channel definition and span bound, the sustained-flux
+observable (max_flux, the maximum flux over vertex-disjoint transport channels —
+NOT the per-site sum of strongest channels and NOT a greedy value), the damping
+and dispatch layers applied to the routed set, and the exact result.json keys and
+checksum serialization are all specified in /app/docs/model_spec.md. Fill in
+`route_flux` to evaluate the transport and record the observables.
 """
 
 from __future__ import annotations
@@ -22,8 +23,9 @@ def route_flux(node_count: int, edges: list[list[int]]) -> dict:
     See /app/docs/model_spec.md for the conditioning of the links, the
     transport-channel definition and 5-link span bound, the max_flux sustained-
     flux observable (the maximum flux over vertex-disjoint channels, which is NOT
-    the per-site sum of strongest channels and NOT a greedy value), the result
-    keys, and the checksum serialization.
+    the per-site sum of strongest channels and NOT a greedy value), the site
+    conditioning input and the damping/dispatch layers, the result keys, and the
+    checksum serialization.
     """
     raise NotImplementedError(
         "Implement the Meridian-2 network transport defined in /app/docs/model_spec.md"
