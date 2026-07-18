@@ -2,11 +2,12 @@
 """Reference implementation of the Meridian-2 flux-routing model.
 
 Given a directed weighted flux network, compute the maximum total flux that can
-be routed out of the source along node-disjoint simple directed paths, together
-with the strongest single pathway and integrity checksums. See
-/app/docs/model_spec.md for the authoritative contract. This is NOT the sum of
-each reachable node's strongest path — pathways that reuse a node cannot both be
-routed, so the routed flux is the best node-disjoint packing.
+be routed out of the source along node-disjoint simple directed paths, the
+tie-broken set of channels that realizes it, several routing aggregates, and
+integrity checksums. See /app/docs/model_spec.md for the authoritative
+contract. This is NOT the sum of each reachable node's strongest path — pathways
+that reuse a node cannot both be routed, so the routed flux is the best
+node-disjoint packing.
 """
 
 from __future__ import annotations
@@ -54,29 +55,51 @@ def _simple_paths(edges: dict[int, dict[int, int]]) -> list[tuple[int, tuple[int
     return paths
 
 
-def _max_flux(paths: list[tuple[int, tuple[int, ...]]]) -> int:
-    """Maximum total weight of node-disjoint (sharing only SOURCE) simple paths."""
-    best_for_set: dict[frozenset[int], int] = {}
+def _packing_items(
+    paths: list[tuple[int, tuple[int, ...]]]
+) -> list[tuple[frozenset[int], int, tuple[int, ...]]]:
+    """One item per distinct non-source node set: its maximum weight and, among
+    the paths achieving that weight, the lexicographically smallest sequence."""
+    best: dict[frozenset[int], tuple[int, tuple[int, ...]]] = {}
     for weight, seq in paths:
         nodes = frozenset(n for n in seq if n != SOURCE)
-        if nodes and (nodes not in best_for_set or weight > best_for_set[nodes]):
-            best_for_set[nodes] = weight
-    items = sorted(best_for_set.items(), key=lambda kv: -kv[1])
-    best = 0
+        if not nodes:
+            continue
+        cur = best.get(nodes)
+        if cur is None or weight > cur[0] or (weight == cur[0] and seq < cur[1]):
+            best[nodes] = (weight, seq)
+    return [(nodes, w, seq) for nodes, (w, seq) in best.items()]
 
-    def rec(index: int, used: frozenset[int], total: int) -> None:
-        nonlocal best
-        if total > best:
-            best = total
-        if index >= len(items):
+
+def _best_flux_packing(
+    items: list[tuple[frozenset[int], int, tuple[int, ...]]]
+) -> tuple[int, list[tuple[int, ...]]]:
+    """Maximum total weight of node-disjoint items (sharing only SOURCE).
+
+    Returns (best_total, best_paths) where best_paths is the tie-break-selected
+    packing: among all node-disjoint item sets whose summed weight equals the
+    maximum, the one whose selected path sequences, sorted ascending, form the
+    lexicographically smallest tuple. The empty packing (0) is the baseline.
+    """
+    ordered = sorted(items, key=lambda it: -it[1])
+    best_total = 0
+    best_sel: tuple[tuple[int, ...], ...] = ()
+
+    def rec(index: int, used: frozenset[int], total: int, chosen: list[tuple[int, ...]]) -> None:
+        nonlocal best_total, best_sel
+        if index >= len(ordered):
+            key = tuple(sorted(chosen))
+            if total > best_total or (total == best_total and key < best_sel):
+                best_total = total
+                best_sel = key
             return
-        rec(index + 1, used, total)
-        nodes, weight = items[index]
+        rec(index + 1, used, total, chosen)
+        nodes, weight, seq = ordered[index]
         if not (nodes & used):
-            rec(index + 1, used | nodes, total + weight)
+            rec(index + 1, used | nodes, total + weight, chosen + [seq])
 
-    rec(0, frozenset(), 0)
-    return best
+    rec(0, frozenset(), 0, [])
+    return best_total, [list(s) for s in best_sel]
 
 
 def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
@@ -92,17 +115,31 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
             strongest_weight = weight
             strongest_seq = seq
 
-    max_flux = _max_flux(paths)
+    items = _packing_items(paths)
+    max_flux, flux_paths = _best_flux_packing(items)
+
+    routed_nodes = sorted({n for seq in flux_paths for n in seq if n != SOURCE})
+    flux_path_count = len(flux_paths)
+    flux_node_count = len(routed_nodes)
+
+    # Residual: best packing over the channels NOT selected (identified by node
+    # set). The competing alternatives that lost the tie-break pack among
+    # themselves, so this is a genuine second packing, not trivially zero.
+    selected_node_sets = {frozenset(n for n in seq if n != SOURCE) for seq in flux_paths}
+    residual_items = [it for it in items if it[0] not in selected_node_sets]
+    residual_flux, _ = _best_flux_packing(residual_items)
 
     edge_payload = "\n".join(
         f"{s}|{t}|{edges[s][t]}" for s in sorted(edges) for t in sorted(edges[s])
     )
     edge_checksum = hashlib.sha256(edge_payload.encode("utf-8")).hexdigest()
 
+    flux_paths_payload = ";".join(">".join(str(n) for n in seq) for seq in flux_paths)
     flux_payload = (
         f"{node_count}|{max_flux}|{strongest_weight}|"
         f"{'>'.join(str(n) for n in strongest_seq)}|"
-        f"{','.join(str(n) for n in reachable)}"
+        f"{','.join(str(n) for n in reachable)}|"
+        f"{flux_node_count}|{residual_flux}|{flux_paths_payload}"
     )
     flux_checksum = hashlib.sha256(flux_payload.encode("utf-8")).hexdigest()
 
@@ -112,6 +149,10 @@ def route_flux(node_count: int, edge_rows: list[list[int]]) -> dict:
         "strongest_path": list(strongest_seq),
         "strongest_path_weight": strongest_weight,
         "max_flux": max_flux,
+        "flux_paths": flux_paths,
+        "flux_path_count": flux_path_count,
+        "flux_node_count": flux_node_count,
+        "residual_flux": residual_flux,
         "edge_checksum": edge_checksum,
         "flux_checksum": flux_checksum,
     }

@@ -51,6 +51,27 @@ committing the highest-flux still-available channel does not in general realise
 the maximum. The sustained flux is the exact maximum over vertex-disjoint channel
 sets.
 
+## The routed channel set and its tie-break
+
+The sustained flux `max_flux` may be realised by more than one set of
+vertex-disjoint channels (ties are common). The **routed set** is selected
+deterministically. First reduce each channel to its non-source **site set** and,
+for each distinct site set, keep the representative channel with the greatest
+flux, breaking equal flux by the lexicographically smallest full site sequence.
+Then, among **all** vertex-disjoint selections of these representatives whose
+total flux equals `max_flux`, choose the selection whose representative site
+sequences, sorted ascending, form the **lexicographically smallest tuple**. This
+is a tie-break over **whole selections**, not a greedy per-channel choice: you
+must consider every selection that attains `max_flux` and then take the
+lexicographically least. `flux_paths` lists that selection's channels (each a
+site-id list beginning with the source), sorted ascending.
+
+The **residual flux** re-runs the identical vertex-disjoint packing objective
+over only the representative channels **not** in the routed set (identified by
+site set); `residual_flux` is that packing's total (0 if none remain). The
+alternatives that lost the tie-break pack among themselves, so this is a genuine
+second packing.
+
 ## Output
 
 Write `result.json` to the output directory (`/app/output` by default) with
@@ -64,14 +85,21 @@ exactly these keys:
   full site sequence. If no channel exists, use `[0]`.
 * `strongest_path_weight` — the flux of `strongest_path` (0 if none).
 * `max_flux` — the sustained flux defined above (integer).
+* `flux_paths` — the tie-broken routed set's channels (each a site-id list from
+  the source), sorted ascending.
+* `flux_path_count` — the number of channels in `flux_paths`.
+* `flux_node_count` — the number of distinct non-source sites used by the routed
+  set.
+* `residual_flux` — the residual packing total defined above.
 * `edge_checksum` — the SHA-256 hex digest of the conditioned links serialized as
   follows: for each `source` in ascending order, and each `target` of that source
   in ascending order, the line `source|target|weight`; lines joined by a single
   `\n`, no trailing newline; hash the UTF-8 encoding.
 * `flux_checksum` — the SHA-256 hex digest of the UTF-8 encoding of
-  `node_count|max_flux|strongest_path_weight|S|R` where `S` is the
-  `strongest_path` site ids joined by `>` and `R` is the `reachable` site ids
-  joined by `,`.
+  `node_count|max_flux|strongest_path_weight|S|R|flux_node_count|residual_flux|P`
+  where `S` is the `strongest_path` site ids joined by `>`, `R` is the
+  `reachable` site ids joined by `,`, and `P` joins the `flux_paths` channels
+  with `;`, each channel's site ids joined by `>`.
 
 The program reads its network from `--input` (default `/app/data/network.json`)
 and writes to `--output-dir` (default `/app/output`).

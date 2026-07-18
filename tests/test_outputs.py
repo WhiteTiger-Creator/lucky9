@@ -86,7 +86,8 @@ def test_result_has_required_keys(result):
     """result.json carries exactly the contracted key set."""
     assert set(result) == {"node_count", "reachable", "strongest_path",
                            "strongest_path_weight", "max_flux",
-                           "edge_checksum", "flux_checksum"}
+                           "flux_paths", "flux_path_count", "flux_node_count",
+                           "residual_flux", "edge_checksum", "flux_checksum"}
 
 
 def test_matches_fixture(result):
@@ -113,12 +114,39 @@ def test_edge_checksum_consistent(result):
 
 def test_flux_checksum_consistent(result):
     """flux_checksum is the SHA-256 of the contracted flux payload."""
+    paths = ";".join(">".join(str(n) for n in seq) for seq in result["flux_paths"])
     payload = (
         f"{result['node_count']}|{result['max_flux']}|{result['strongest_path_weight']}|"
         f"{'>'.join(str(n) for n in result['strongest_path'])}|"
-        f"{','.join(str(n) for n in result['reachable'])}"
+        f"{','.join(str(n) for n in result['reachable'])}|"
+        f"{result['flux_node_count']}|{result['residual_flux']}|{paths}"
     )
     assert result["flux_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
+
+
+def test_routed_set_is_valid_disjoint_optimal(result):
+    """flux_paths is a vertex-disjoint channel set summing to max_flux."""
+    data = json.loads(DATA.read_text())
+    edges = _canonical_edges(data["edges"])
+    paths = result["flux_paths"]
+    assert paths == sorted(paths), "flux_paths must be sorted ascending"
+    assert result["flux_path_count"] == len(paths)
+    used, total, sites = set(), 0, set()
+    for seq in paths:
+        assert seq[0] == SOURCE, "each channel begins at the source"
+        body = [n for n in seq if n != SOURCE]
+        assert not (set(body) & used), "routed channels are not vertex-disjoint"
+        used |= set(body)
+        sites |= set(body)
+        # channel flux is the sum of its consecutive edge weights
+        total += sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
+    assert total == result["max_flux"], "routed set flux != max_flux"
+    assert result["flux_node_count"] == len(sites)
+
+
+def test_residual_below_max_flux(result):
+    """residual_flux is a valid packing no larger than max_flux."""
+    assert 0 <= result["residual_flux"] <= result["max_flux"]
 
 
 def test_max_flux_is_packing_not_naive_sum(result):

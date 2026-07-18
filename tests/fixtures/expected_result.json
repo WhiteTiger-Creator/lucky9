@@ -1,5 +1,5 @@
 {
-  "node_count": 17,
+  "node_count": 11,
   "reachable": [
     1,
     2,
@@ -10,24 +10,48 @@
     7,
     8,
     9,
-    10,
-    11,
-    12,
-    13,
-    14,
-    15,
-    16
+    10
   ],
   "strongest_path": [
     0,
-    3,
-    5,
-    6,
-    9,
-    10
+    1,
+    2
   ],
-  "strongest_path_weight": 35,
-  "max_flux": 85,
-  "edge_checksum": "6c81142c1bc7113be66654432ac4f88ebb37407743fe4873f9bf992bbccd175c",
-  "flux_checksum": "3a0be5e967da58dfde105851fe5fe37b7ab8eb252603890dbdc3b6d4bd0b5a88"
+  "strongest_path_weight": 16,
+  "max_flux": 72,
+  "flux_paths": [
+    [
+      0,
+      1,
+      2
+    ],
+    [
+      0,
+      3,
+      4
+    ],
+    [
+      0,
+      5,
+      6
+    ],
+    [
+      0,
+      7,
+      8
+    ],
+    [
+      0,
+      9
+    ],
+    [
+      0,
+      10
+    ]
+  ],
+  "flux_path_count": 6,
+  "flux_node_count": 10,
+  "residual_flux": 70,
+  "edge_checksum": "2f4641282330046aa60e2bb0a9727ca04433b3acb5cf5ce02c9fc31fdd47a384",
+  "flux_checksum": "47091e3b8d7f4ed2700480295349912c80c887cc16884063ed501f6bd6acacd2"
 }
