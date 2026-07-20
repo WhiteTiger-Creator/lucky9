@@ -57,31 +57,32 @@
   "total_path_efficiency": 36,
   "max_path_efficiency": 8,
   "mean_flux_floor": 11,
-  "saturated_endpoints": [],
-  "saturated_channel_count": 0,
+  "saturated_endpoints": [
+    10
+  ],
+  "saturated_channel_count": 1,
   "max_throughput": 18,
-  "throughput_ledger_checksum": "e859788345c8d3b12afd9954f6003de851beb633ecfef4a2d02c280fdbced2c6",
+  "throughput_ledger_checksum": "65ff141302a81b5e0d515318898471e896f7d29b959e147a8bf529affed2fb75",
   "total_damping": 23,
+  "policy_checksum": "1565ccf4a96129450bb407cbf071ecfcae93669808b8b1d4fd80a98c105714bf",
   "total_contention_overlap": 9,
   "dispatched_endpoints": [
     4,
-    10,
     11
   ],
-  "dispatched_channel_count": 3,
-  "total_conditioned_flux": 19,
+  "dispatched_channel_count": 2,
+  "total_conditioned_flux": 14,
   "max_conditioned_flux": 8,
   "class_counts": {
     "primary": 2,
     "secondary": 0,
-    "tertiary": 1
+    "tertiary": 0
   },
   "dispatch_order": [
     4,
-    11,
-    10
+    11
   ],
-  "dispatch_checksum": "0c69782aea19564869562054f95a98205272cc60d12f40f3679a934ba5de7a13",
+  "dispatch_checksum": "213bb69688b8abe54f93811c3a2d61d389dd8d6bc4bdad413ea6a79cc66b14e6",
   "edge_checksum": "925f8fd62d56167f5198504b2eacca282df4004fdb8063c8047dde4976a788be",
-  "flux_checksum": "038691b74b2c2071c732bf7df12eceb7293306b4e002d5519d48f1ef02f0b344"
+  "flux_checksum": "8a094ecf5fc66bd07b4865d804ba1cabd03dcb312e51953c25b01cf0c8de79a9"
 }

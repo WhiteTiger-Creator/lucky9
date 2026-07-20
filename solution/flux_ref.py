@@ -26,7 +26,15 @@ CONDITIONING_PATH = Path("/app/data/site_conditioning.json")
 DAMPING_MIN = 0
 DAMPING_MAX = 12
 CLASS_DISPATCH_CAP = 2
-DISPATCH_FLOOR = 5
+POLICY_PATH = Path("/app/data/transport_policies.json")
+POLICY_FIELDS = (
+    "dispatch_floor", "primary_min", "primary_damping_max",
+    "saturation_threshold", "throughput_cap",
+)
+DEFAULT_POLICY = {
+    "dispatch_floor": 5, "primary_min": 6, "primary_damping_max": 7,
+    "saturation_threshold": 20, "throughput_cap": 60,
+}
 CLASS_ORDER = ["primary", "secondary", "tertiary"]
 CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDER)}
 
@@ -64,6 +72,57 @@ def canonical_damping(rows: list[dict]) -> dict[int, int]:
         if cur is None or value < cur:
             out[site] = value
     return out
+
+
+def load_policies(path: Path = POLICY_PATH) -> dict:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _normalize_policy(raw: object) -> dict:
+    """Start from the shipped baseline and overlay any field the object supplies."""
+    resolved = dict(DEFAULT_POLICY)
+    if isinstance(raw, dict):
+        for key in POLICY_FIELDS:
+            if key in raw:
+                resolved[key] = int(raw[key])
+    return resolved
+
+
+def policy_for_hub(hub: int, policy_data: dict) -> dict:
+    """Resolve one ingress hub's policy: baseline, then default, then that hub's override.
+
+    A sparse override supplies only the fields it names; every unlisted field is
+    inherited, so an override is never a complete policy on its own.
+    """
+    base = _normalize_policy(policy_data.get("default", {}))
+    overrides = policy_data.get("hub_overrides", {})
+    if not isinstance(overrides, dict):
+        return base
+    raw = overrides.get(str(hub))
+    if not isinstance(raw, dict):
+        return base
+    merged = dict(base)
+    for key in POLICY_FIELDS:
+        if key in raw:
+            merged[key] = int(raw[key])
+    return merged
+
+
+def policy_checksum(policy_data: dict) -> str:
+    """Resolved default, then each overridden hub in ascending numeric hub order."""
+    lines = [
+        "default|" + "|".join(
+            str(_normalize_policy(policy_data.get("default", {}))[k]) for k in POLICY_FIELDS
+        )
+    ]
+    overrides = policy_data.get("hub_overrides", {})
+    if isinstance(overrides, dict):
+        for hub in sorted(overrides, key=lambda h: int(h)):
+            resolved = policy_for_hub(int(hub), policy_data)
+            lines.append(f"{hub}|" + "|".join(str(resolved[k]) for k in POLICY_FIELDS))
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 
 def load_conditioning(path: Path = CONDITIONING_PATH) -> dict[int, int]:
@@ -138,7 +197,9 @@ def _best_flux_packing(
     return best_total, [list(s) for s in best_sel]
 
 
-def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, int] | None = None) -> dict:
+def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, int] | None = None,
+               policy_data: dict | None = None) -> dict:
+    policy_data = policy_data or {}
     edges = canonical_edges(edge_rows)
     paths = _simple_paths(edges)
     damping = damping or {}
@@ -188,8 +249,8 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
     # term shifts a channel across the threshold and changes the set, the count
     # and the ledger checksum. The decay/credit divisors, the threshold and the
     # carry cap are governed by the calibration log.
-    SATURATION_THRESHOLD = 20
-    THROUGHPUT_CAP = 60
+    # MX-2261: thresholds are resolved PER CHANNEL from the ingress hub's policy
+    # (the channel's first hop), not taken from a single global constant.
     prev_out = 0
     saturated_endpoints: list[int] = []
     max_throughput = 0
@@ -200,8 +261,11 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
         cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
         carry_in = max(prev_out - (hops * 5) // 3, 0)
         throughput = cflux + carry_in // 4
-        carry_out = min(carry_in + cflux - (hops // 2), THROUGHPUT_CAP)
-        saturated = throughput >= SATURATION_THRESHOLD
+        hub_policy = policy_for_hub(seq[1], policy_data) if len(seq) > 1 else _normalize_policy(
+            policy_data.get("default", {})
+        )
+        carry_out = min(carry_in + cflux - (hops // 2), hub_policy["throughput_cap"])
+        saturated = throughput >= hub_policy["saturation_threshold"]
         if saturated:
             saturated_endpoints.append(seq[-1])
         max_throughput = max(max_throughput, throughput)
@@ -214,6 +278,7 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
                 "channel_flux": cflux,
                 "throughput": throughput,
                 "saturated": saturated,
+                "policy": hub_policy,
             }
         )
         prev_out = carry_out
@@ -263,13 +328,18 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
         total_damping += damping_sum
         total_contention_overlap += contention_overlap
 
-    dispatched = [ch for ch in channels if ch["conditioned_flux"] >= DISPATCH_FLOOR]
+    dispatched = [
+        ch for ch in channels if ch["conditioned_flux"] >= ch["policy"]["dispatch_floor"]
+    ]
 
     # Dispatch class per MX-2221 final. Clauses are evaluated in order; the
     # first matching clause fixes the class.
     for ch in dispatched:
         if (
-            (ch["conditioned_flux"] >= 6 and ch["damping_sum"] <= 7)
+            (
+                ch["conditioned_flux"] >= ch["policy"]["primary_min"]
+                and ch["damping_sum"] <= ch["policy"]["primary_damping_max"]
+            )
             or (ch["saturated"] and ch["hops"] <= 1)
         ):
             ch["dispatch_class"] = "primary"
@@ -361,6 +431,7 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
         "max_throughput": max_throughput,
         "throughput_ledger_checksum": throughput_ledger_checksum,
         "total_damping": total_damping,
+        "policy_checksum": policy_checksum(policy_data),
         "total_contention_overlap": total_contention_overlap,
         "dispatched_endpoints": dispatched_endpoints,
         "dispatched_channel_count": dispatched_channel_count,
@@ -381,7 +452,7 @@ def main() -> int:
     args = parser.parse_args()
     data = json.loads(Path(args.input).read_text())
     damping = load_conditioning()
-    result = route_flux(data["node_count"], data["edges"], damping)
+    result = route_flux(data["node_count"], data["edges"], damping, load_policies())
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
     (out / "result.json").write_text(json.dumps(result, indent=2) + "\n")

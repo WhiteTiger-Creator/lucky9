@@ -92,7 +92,7 @@ def test_result_has_required_keys(result):
                            "max_path_efficiency", "mean_flux_floor",
                            "saturated_endpoints", "saturated_channel_count",
                            "max_throughput", "throughput_ledger_checksum",
-                           "total_damping", "total_contention_overlap",
+                           "total_damping", "total_contention_overlap", "policy_checksum",
                            "dispatched_endpoints",
                            "dispatched_channel_count", "total_conditioned_flux",
                            "max_conditioned_flux", "class_counts",
@@ -145,17 +145,22 @@ def test_throughput_ledger_consistent(result):
     """The throughput ledger reproduces the log-governed carry/threshold rule."""
     data = json.loads(DATA.read_text())
     edges = _canonical_edges(data["edges"])
+    policy_data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
     prev_out, sat, max_tp, rows = 0, [], 0, []
     for seq in result["flux_paths"]:
         hops = len(seq) - 1
+        # MX-2261: the carry cap and saturation bar come from the INGRESS HUB's
+        # resolved policy, so they differ between channels.
+        pol = _resolve_policy(seq[1], policy_data) if len(seq) > 1 else _resolve_policy("_", policy_data)
         cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
         carry_in = max(prev_out - (hops * 5) // 3, 0)
         throughput = cflux + carry_in // 4
-        carry_out = min(carry_in + cflux - (hops // 2), 60)
-        if throughput >= 20:
+        carry_out = min(carry_in + cflux - (hops // 2), pol["throughput_cap"])
+        saturated = throughput >= pol["saturation_threshold"]
+        if saturated:
             sat.append(seq[-1])
         max_tp = max(max_tp, throughput)
-        rows.append(f"{seq[-1]}|{throughput}|{1 if throughput >= 20 else 0}|{carry_out}")
+        rows.append(f"{seq[-1]}|{throughput}|{1 if saturated else 0}|{carry_out}")
         prev_out = carry_out
     assert result["saturated_endpoints"] == sorted(sat)
     assert result["saturated_channel_count"] == len(sat)
@@ -299,17 +304,20 @@ def _dispatch_layer(result):
     """Recompute the damping/dispatch layer independently from the routed set."""
     edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
     damping = _canonical_damping()
+    policy_data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
     prev_out, channels = 0, []
     for seq in result["flux_paths"]:
         hops = len(seq) - 1
+        pol = _resolve_policy(seq[1], policy_data) if len(seq) > 1 else _resolve_policy("_", policy_data)
         cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
         carry_in = max(prev_out - (hops * 5) // 3, 0)
         throughput = cflux + carry_in // 4
-        prev_out = min(carry_in + cflux - (hops // 2), 60)
+        prev_out = min(carry_in + cflux - (hops // 2), pol["throughput_cap"])
         dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
         channels.append({
             "endpoint": seq[-1], "hops": hops, "channel_flux": cflux, "seq": seq,
-            "throughput": throughput, "saturated": throughput >= 20,
+            "throughput": throughput, "saturated": throughput >= pol["saturation_threshold"],
+            "policy": pol,
             "damping_sum": dsum,
         })
     # MX-2257: contention from unrouted candidates, attributed to a single owner.
@@ -320,9 +328,12 @@ def _dispatch_layer(result):
         c["contention_overlap"] = co
         c["damped_flux"] = damped
         c["conditioned_flux"] = max(damped - (c["hops"] * 3) // 2, 0)
-    dispatched = [c for c in channels if c["conditioned_flux"] >= DISPATCH_FLOOR]
+    dispatched = [c for c in channels if c["conditioned_flux"] >= c["policy"]["dispatch_floor"]]
     for c in dispatched:
-        if (c["conditioned_flux"] >= 6 and c["damping_sum"] <= 7) or (c["saturated"] and c["hops"] <= 1):
+        if (
+            c["conditioned_flux"] >= c["policy"]["primary_min"]
+            and c["damping_sum"] <= c["policy"]["primary_damping_max"]
+        ) or (c["saturated"] and c["hops"] <= 1):
             c["dispatch_class"] = "primary"
         elif c["saturated"] or c["damped_flux"] >= 12:
             c["dispatch_class"] = "secondary"
@@ -504,3 +515,79 @@ def test_mx_2257_owner_counts_only_its_own_intersection(result):
     assert multi_claimant > 0, "no candidate has multiple claimants -- MX-2257 is dormant"
     assert governing < owner_absorbs_all, "readings coincide -- test cannot discriminate"
     assert governing < every_claimant, "readings coincide -- test cannot discriminate"
+
+
+POLICY_PATH = Path("/app/data/transport_policies.json")
+POLICY_FIELDS = (
+    "dispatch_floor", "primary_min", "primary_damping_max",
+    "saturation_threshold", "throughput_cap",
+)
+BASELINE_POLICY = {
+    "dispatch_floor": 5, "primary_min": 6, "primary_damping_max": 7,
+    "saturation_threshold": 20, "throughput_cap": 60,
+}
+
+
+def _resolve_policy(hub, data):
+    base = dict(BASELINE_POLICY)
+    for k in POLICY_FIELDS:
+        if k in data.get("default", {}):
+            base[k] = int(data["default"][k])
+    raw = data.get("hub_overrides", {}).get(str(hub))
+    if not isinstance(raw, dict):
+        return base
+    merged = dict(base)
+    for k in POLICY_FIELDS:
+        if k in raw:
+            merged[k] = int(raw[k])
+    return merged
+
+
+def test_policy_source_path_affects_output(tmp_path: Path):
+    """MX-2261: thresholds come from the policy file, not from hardcoded constants."""
+    original = POLICY_PATH.read_text(encoding="utf-8")
+    try:
+        baseline = _run(tmp_path / "base")
+        bumped = json.loads(original)
+        bumped["default"]["dispatch_floor"] = 99
+        POLICY_PATH.write_text(json.dumps(bumped), encoding="utf-8")
+        changed = _run(tmp_path / "changed")
+        assert changed["dispatched_channel_count"] < baseline["dispatched_channel_count"]
+        assert changed["policy_checksum"] != baseline["policy_checksum"]
+    finally:
+        POLICY_PATH.write_text(original, encoding="utf-8")
+
+
+def test_sparse_hub_override_inherits_remaining_fields():
+    """A hub override names some fields; every unlisted field is inherited."""
+    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    sparse = [h for h, v in data["hub_overrides"].items() if len(v) < len(POLICY_FIELDS)]
+    assert sparse, "no sparse override -- the inheritance rule is dormant"
+    for hub in sparse:
+        resolved = _resolve_policy(hub, data)
+        assert set(resolved) == set(POLICY_FIELDS)
+        for key in POLICY_FIELDS:
+            if key not in data["hub_overrides"][hub]:
+                expected = int(data["default"].get(key, BASELINE_POLICY[key]))
+                assert resolved[key] == expected, f"{hub}.{key} did not inherit"
+
+
+def test_policy_default_may_omit_fields_and_falls_back_to_baseline():
+    """The file default is itself partial; omitted fields keep the shipped baseline."""
+    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    omitted = [k for k in POLICY_FIELDS if k not in data.get("default", {})]
+    assert omitted, "file default names every field -- the baseline tier is dormant"
+    for key in omitted:
+        assert _resolve_policy("no-such-hub", data)[key] == BASELINE_POLICY[key]
+
+
+def test_policy_checksum_consistent(result):
+    """policy_checksum serializes the RESOLVED values, default then hubs ascending."""
+    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+    base = _resolve_policy("no-such-hub", data)
+    lines = ["default|" + "|".join(str(base[k]) for k in POLICY_FIELDS)]
+    for hub in sorted(data.get("hub_overrides", {}), key=lambda h: int(h)):
+        resolved = _resolve_policy(hub, data)
+        lines.append(f"{hub}|" + "|".join(str(resolved[k]) for k in POLICY_FIELDS))
+    expected = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+    assert result["policy_checksum"] == expected

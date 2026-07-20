@@ -70,6 +70,7 @@ log; this contract fixes only the key set and the serializations below.
   and `c` is `1` if the channel is saturated else `0`; lines joined by a single `\n`,
   no trailing newline; hash the UTF-8 encoding (throughput/flag/carry_out per the log).
 * `total_damping` — the summed site damping accumulated over **all** routed channels
+* `policy_checksum` — sha256 over the resolved per-hub transport policies, serialized as the calibration log's policy entry specifies
 * `total_contention_overlap` — the summed per-channel `contention_overlap` produced by the site-contention attribution in the calibration log; each unrouted candidate is attributed to a single owning routed channel, so a contended site is never counted by two channels
   (per the log; dispatched or not).
 * `dispatched_endpoints` — a JSON **array** of the terminal site ids (ascending) of the
