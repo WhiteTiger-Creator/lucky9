@@ -92,7 +92,8 @@ def test_result_has_required_keys(result):
                            "max_path_efficiency", "mean_flux_floor",
                            "saturated_endpoints", "saturated_channel_count",
                            "max_throughput", "throughput_ledger_checksum",
-                           "total_damping", "dispatched_endpoints",
+                           "total_damping", "total_contention_overlap",
+                           "dispatched_endpoints",
                            "dispatched_channel_count", "total_conditioned_flux",
                            "max_conditioned_flux", "class_counts",
                            "dispatch_order", "dispatch_checksum",
@@ -235,7 +236,7 @@ def test_source_does_not_reference_verifier_trees():
 CONDITIONING = Path("/app/data/site_conditioning.json")
 CLASS_ORDER = ("primary", "secondary", "tertiary")
 CLASS_RANK = {n: len(CLASS_ORDER) - i for i, n in enumerate(CLASS_ORDER)}
-DISPATCH_FLOOR = 7
+DISPATCH_FLOOR = 5
 
 
 def _canonical_damping():
@@ -252,6 +253,48 @@ def _canonical_damping():
     return out
 
 
+def _contention_overlaps(result, edges):
+    """MX-2257 attribution: {owner_endpoint: contention_overlap}, computed here
+    independently of the reconciler so the dispatch recomputation stays honest."""
+    paths = []
+
+    def dfs(node, weight, nodes, depth):
+        for target in sorted(edges.get(node, {})):
+            if target in nodes:
+                continue
+            seq = nodes + (target,)
+            paths.append((weight + edges[node][target], seq))
+            if depth + 1 < HOP_BOUND:
+                dfs(target, weight + edges[node][target], seq, depth + 1)
+
+    dfs(SOURCE, 0, (SOURCE,), 0)
+    best = {}
+    for weight, seq in paths:
+        nodes = frozenset(n for n in seq if n != SOURCE)
+        if not nodes:
+            continue
+        cur = best.get(nodes)
+        if cur is None or weight > cur[0] or (weight == cur[0] and seq < cur[1]):
+            best[nodes] = (weight, seq)
+
+    routed = [frozenset(n for n in seq if n != SOURCE) for seq in result["flux_paths"]]
+    endpoints = [seq[-1] for seq in result["flux_paths"]]
+    fluxes = [
+        sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
+        for seq in result["flux_paths"]
+    ]
+    out = {}
+    for nodes in best:
+        if nodes in routed:
+            continue
+        claimants = [i for i, rs in enumerate(routed) if rs & nodes]
+        if not claimants:
+            continue
+        owner = sorted(claimants, key=lambda i: (-fluxes[i], endpoints[i]))[0]
+        out[endpoints[owner]] = out.get(endpoints[owner], 0) + len(routed[owner] & nodes)
+    return out
+
+
 def _dispatch_layer(result):
     """Recompute the damping/dispatch layer independently from the routed set."""
     edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
@@ -264,17 +307,22 @@ def _dispatch_layer(result):
         throughput = cflux + carry_in // 4
         prev_out = min(carry_in + cflux - (hops // 2), 60)
         dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
-        damped = max(cflux - (-(-dsum // 2)), 0)          # ceil(dsum/2)
-        conditioned = max(damped - (hops * 3) // 2, 0)     # floored hop term
         channels.append({
-            "endpoint": seq[-1], "hops": hops, "channel_flux": cflux,
+            "endpoint": seq[-1], "hops": hops, "channel_flux": cflux, "seq": seq,
             "throughput": throughput, "saturated": throughput >= 20,
-            "damping_sum": dsum, "damped_flux": damped,
-            "conditioned_flux": conditioned,
+            "damping_sum": dsum,
         })
+    # MX-2257: contention from unrouted candidates, attributed to a single owner.
+    contention = _contention_overlaps(result, edges)
+    for c in channels:
+        co = contention.get(c["endpoint"], 0)
+        damped = max(c["channel_flux"] - (-(-c["damping_sum"] // 2)) - co, 0)
+        c["contention_overlap"] = co
+        c["damped_flux"] = damped
+        c["conditioned_flux"] = max(damped - (c["hops"] * 3) // 2, 0)
     dispatched = [c for c in channels if c["conditioned_flux"] >= DISPATCH_FLOOR]
     for c in dispatched:
-        if (c["conditioned_flux"] >= 8 and c["damping_sum"] <= 7) or (c["saturated"] and c["hops"] <= 1):
+        if (c["conditioned_flux"] >= 6 and c["damping_sum"] <= 7) or (c["saturated"] and c["hops"] <= 1):
             c["dispatch_class"] = "primary"
         elif c["saturated"] or c["damped_flux"] >= 12:
             c["dispatch_class"] = "secondary"
@@ -387,3 +435,72 @@ def test_conditioning_path_is_fixed_not_relative_to_input(tmp_path):
     got = _run(tmp_path / "run", input_path=staged)
     alt_expected = json.loads((FIX / "alt_expected.json").read_text())
     assert got == alt_expected
+
+
+def test_mx_2257_owner_counts_only_its_own_intersection(result):
+    """MX-2257: the owning routed channel adds |own_sites & candidate_sites|, no more.
+
+    Three readings of the attribution rule are possible and the wrong two overstate
+    the total. This recomputes the candidate set independently from the network and
+    pins the governing reading, asserting the alternatives genuinely differ so the
+    check cannot pass tautologically -- and so the rule cannot go dormant unnoticed.
+    """
+    net = json.loads(DATA.read_text())
+    edges: dict[int, dict[int, int]] = {}
+    for src, dst, w in net["edges"]:
+        if src == dst or not 1 <= w <= 9:   # canonicalization drops these
+            continue
+        cur = edges.setdefault(src, {}).get(dst)
+        if cur is None or w < cur:          # MX-2251: minimum weight wins
+            edges[src][dst] = w
+
+    paths: list[tuple[int, tuple[int, ...]]] = []
+
+    def dfs(node, weight, nodes, depth):
+        for target in sorted(edges.get(node, {})):
+            if target in nodes:
+                continue
+            seq = nodes + (target,)
+            paths.append((weight + edges[node][target], seq))
+            if depth + 1 < HOP_BOUND:
+                dfs(target, weight + edges[node][target], seq, depth + 1)
+
+    dfs(SOURCE, 0, (SOURCE,), 0)
+
+    best: dict[frozenset, tuple[int, tuple]] = {}
+    for weight, seq in paths:
+        nodes = frozenset(n for n in seq if n != SOURCE)
+        if not nodes:
+            continue
+        cur = best.get(nodes)
+        if cur is None or weight > cur[0] or (weight == cur[0] and seq < cur[1]):
+            best[nodes] = (weight, seq)
+
+    routed = [frozenset(n for n in seq if n != SOURCE) for seq in result["flux_paths"]]
+    endpoints = [seq[-1] for seq in result["flux_paths"]]
+    fluxes = [
+        sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
+        for seq in result["flux_paths"]
+    ]
+    candidates = [nodes for nodes in best if nodes not in routed]
+
+    governing = every_claimant = owner_absorbs_all = 0
+    multi_claimant = 0
+    for cand in candidates:
+        claimants = [i for i, rs in enumerate(routed) if rs & cand]
+        if not claimants:
+            continue
+        if len(claimants) > 1:
+            multi_claimant += 1
+        owner = sorted(claimants, key=lambda i: (-fluxes[i], endpoints[i]))[0]
+        governing += len(routed[owner] & cand)
+        shared_any = set()
+        for i in claimants:
+            shared_any |= routed[i] & cand
+            every_claimant += len(routed[i] & cand)
+        owner_absorbs_all += len(shared_any)
+
+    assert result["total_contention_overlap"] == governing
+    assert multi_claimant > 0, "no candidate has multiple claimants -- MX-2257 is dormant"
+    assert governing < owner_absorbs_all, "readings coincide -- test cannot discriminate"
+    assert governing < every_claimant, "readings coincide -- test cannot discriminate"

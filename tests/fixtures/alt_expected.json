@@ -62,21 +62,26 @@
   "max_throughput": 18,
   "throughput_ledger_checksum": "e859788345c8d3b12afd9954f6003de851beb633ecfef4a2d02c280fdbced2c6",
   "total_damping": 23,
+  "total_contention_overlap": 9,
   "dispatched_endpoints": [
-    4
+    4,
+    10,
+    11
   ],
-  "dispatched_channel_count": 1,
-  "total_conditioned_flux": 11,
-  "max_conditioned_flux": 11,
+  "dispatched_channel_count": 3,
+  "total_conditioned_flux": 19,
+  "max_conditioned_flux": 8,
   "class_counts": {
-    "primary": 1,
+    "primary": 2,
     "secondary": 0,
-    "tertiary": 0
+    "tertiary": 1
   },
   "dispatch_order": [
-    4
+    4,
+    11,
+    10
   ],
-  "dispatch_checksum": "ca04b8b2842294b52c289239c0cbb750c0bc7cb3985c197b2839d8b640e83c4c",
+  "dispatch_checksum": "0c69782aea19564869562054f95a98205272cc60d12f40f3679a934ba5de7a13",
   "edge_checksum": "925f8fd62d56167f5198504b2eacca282df4004fdb8063c8047dde4976a788be",
-  "flux_checksum": "13bd7225e90c34c52ff5cac2700b33d617197b4e79e869956d9f242523d688e8"
+  "flux_checksum": "038691b74b2c2071c732bf7df12eceb7293306b4e002d5519d48f1ef02f0b344"
 }

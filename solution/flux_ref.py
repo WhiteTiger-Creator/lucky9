@@ -26,7 +26,7 @@ CONDITIONING_PATH = Path("/app/data/site_conditioning.json")
 DAMPING_MIN = 0
 DAMPING_MAX = 12
 CLASS_DISPATCH_CAP = 2
-DISPATCH_FLOOR = 7
+DISPATCH_FLOOR = 5
 CLASS_ORDER = ["primary", "secondary", "tertiary"]
 CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDER)}
 
@@ -230,15 +230,38 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
     # damping sum, a ceil read as a floor, or a wrong routed set moves channels
     # across the boundary and changes the dispatched set, the class counts, the
     # dispatch order and the dispatch checksum together.
+    # MX-2257: site contention. An unrouted candidate that contends for sites held
+    # by more than one routed channel is attributed to exactly ONE of them -- the
+    # highest channel_flux, ties by smallest endpoint. That owner adds the number of
+    # sites IT ITSELF shares with the candidate; every other claimant adds zero for
+    # that candidate, and sites the candidate shares only with a non-owner are
+    # counted by nobody.
+    total_contention_overlap = 0
+    for ch in channels:
+        ch["site_set"] = frozenset(n for n in ch["seq"] if n != SOURCE)
+    for nodes, _weight, _seq in residual_items:
+        claimants = [ch for ch in channels if ch["site_set"] & nodes]
+        if not claimants:
+            continue
+        owner = sorted(claimants, key=lambda c: (-c["channel_flux"], c["endpoint"]))[0]
+        owner["contention_overlap"] = owner.get("contention_overlap", 0) + len(
+            owner["site_set"] & nodes
+        )
+
     total_damping = 0
     for ch in channels:
         damping_sum = sum(damping.get(n, 0) for n in ch["seq"] if n != SOURCE)
-        damped_flux = max(ch["channel_flux"] - (-(-damping_sum // 2)), 0)
+        contention_overlap = ch.get("contention_overlap", 0)
+        damped_flux = max(
+            ch["channel_flux"] - (-(-damping_sum // 2)) - contention_overlap, 0
+        )
         conditioned_flux = max(damped_flux - (ch["hops"] * 3) // 2, 0)
         ch["damping_sum"] = damping_sum
+        ch["contention_overlap"] = contention_overlap
         ch["damped_flux"] = damped_flux
         ch["conditioned_flux"] = conditioned_flux
         total_damping += damping_sum
+        total_contention_overlap += contention_overlap
 
     dispatched = [ch for ch in channels if ch["conditioned_flux"] >= DISPATCH_FLOOR]
 
@@ -246,7 +269,7 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
     # first matching clause fixes the class.
     for ch in dispatched:
         if (
-            (ch["conditioned_flux"] >= 8 and ch["damping_sum"] <= 7)
+            (ch["conditioned_flux"] >= 6 and ch["damping_sum"] <= 7)
             or (ch["saturated"] and ch["hops"] <= 1)
         ):
             ch["dispatch_class"] = "primary"
@@ -338,6 +361,7 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
         "max_throughput": max_throughput,
         "throughput_ledger_checksum": throughput_ledger_checksum,
         "total_damping": total_damping,
+        "total_contention_overlap": total_contention_overlap,
         "dispatched_endpoints": dispatched_endpoints,
         "dispatched_channel_count": dispatched_channel_count,
         "total_conditioned_flux": total_conditioned_flux,

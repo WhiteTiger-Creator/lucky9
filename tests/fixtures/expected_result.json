@@ -92,27 +92,28 @@
   "max_throughput": 23,
   "throughput_ledger_checksum": "c503544dbe06c074c4a80d67056535b742a3864cae7dc8d06063638f550a0c9d",
   "total_damping": 26,
+  "total_contention_overlap": 15,
   "dispatched_endpoints": [
     4,
     6,
-    8,
-    10
+    12,
+    17
   ],
   "dispatched_channel_count": 4,
-  "total_conditioned_flux": 31,
-  "max_conditioned_flux": 9,
+  "total_conditioned_flux": 23,
+  "max_conditioned_flux": 7,
   "class_counts": {
     "primary": 2,
     "secondary": 1,
     "tertiary": 1
   },
   "dispatch_order": [
+    17,
     4,
-    6,
-    10,
-    8
+    12,
+    6
   ],
-  "dispatch_checksum": "59f073ba22d63a513e82afa0ad8ea86e759278b4398dbcab59250a797826d0b8",
+  "dispatch_checksum": "fe09a27cfd7c412afeb619e0195e7989be81df2b8cf890c82e7138bb0d94d37f",
   "edge_checksum": "7783762a2a6200872c57d96bb35ca13af8f6c1a4f66db574053a1c23b54b7e63",
-  "flux_checksum": "48cd343901f59264597c99c3960445ffaaf2168c52de6e614958870b198f250e"
+  "flux_checksum": "e000349d614f08ffa6f05b3f0cf38d1efa5f539c0db68fe6ba6542fe6b2319cf"
 }
