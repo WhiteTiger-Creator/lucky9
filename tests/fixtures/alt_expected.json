@@ -15,11 +15,11 @@
   ],
   "strongest_path": [
     0,
-    1,
+    3,
     2
   ],
   "strongest_path_weight": 17,
-  "max_flux": 74,
+  "max_flux": 68,
   "flux_paths": [
     [
       0,
@@ -53,36 +53,30 @@
   ],
   "flux_path_count": 6,
   "flux_node_count": 11,
-  "residual_flux": 57,
-  "total_path_efficiency": 39,
+  "residual_flux": 51,
+  "total_path_efficiency": 36,
   "max_path_efficiency": 8,
-  "mean_flux_floor": 12,
-  "saturated_endpoints": [
-    4,
-    10,
-    11
-  ],
-  "saturated_channel_count": 3,
-  "max_throughput": 20,
-  "throughput_ledger_checksum": "3e36d8d7527a6c0e9fdd9e3554e5e6141b82c71977dc3c4274c281ad999c4d44",
-  "total_damping": 26,
+  "mean_flux_floor": 11,
+  "saturated_endpoints": [],
+  "saturated_channel_count": 0,
+  "max_throughput": 18,
+  "throughput_ledger_checksum": "e859788345c8d3b12afd9954f6003de851beb633ecfef4a2d02c280fdbced2c6",
+  "total_damping": 23,
   "dispatched_endpoints": [
-    2,
     4
   ],
-  "dispatched_channel_count": 2,
-  "total_conditioned_flux": 19,
-  "max_conditioned_flux": 10,
+  "dispatched_channel_count": 1,
+  "total_conditioned_flux": 11,
+  "max_conditioned_flux": 11,
   "class_counts": {
     "primary": 1,
-    "secondary": 1,
+    "secondary": 0,
     "tertiary": 0
   },
   "dispatch_order": [
-    2,
     4
   ],
-  "dispatch_checksum": "b5b609ee33660bd81d6ba50b440a255ddc779ae1de74e68d274eaa135e4c59f1",
-  "edge_checksum": "a1bfa24fe8643ea9d2841f9d22ebf2f0ec08c741e3446617fbf9c30436d54c86",
-  "flux_checksum": "3ec02d7a4eed489d16097a0d4714da721d94d370868b482963154fbdba699134"
+  "dispatch_checksum": "ca04b8b2842294b52c289239c0cbb750c0bc7cb3985c197b2839d8b640e83c4c",
+  "edge_checksum": "925f8fd62d56167f5198504b2eacca282df4004fdb8063c8047dde4976a788be",
+  "flux_checksum": "13bd7225e90c34c52ff5cac2700b33d617197b4e79e869956d9f242523d688e8"
 }

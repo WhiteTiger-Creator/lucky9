@@ -85,6 +85,9 @@ log; this contract fixes only the key set and the serializations below.
 * `dispatch_order` — a JSON **array** of the dispatched channels' terminal site ids in the
   log's dispatch ordering (this is an ordering, **not** sorted ascending; contrast
   `dispatched_endpoints`, which is sorted).
+The dispatch fields describe the dispatch list AFTER the capacity cap defined in the
+calibration log, not before it.
+
 * `dispatch_checksum` — the SHA-256 hex digest of the dispatch rows serialized as
   follows: for each dispatched channel in `dispatch_order` order, the line
   `endpoint|class|conditioned_flux|damped_flux|damping_sum`; lines joined by a single

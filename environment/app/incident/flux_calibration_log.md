@@ -265,6 +265,15 @@ Rao on shift. Ambient magnetic shielding was re-measured after building works. V
 ### Review entry 1332 — probe bench
 Nadia on shift. The shift rota changed to accommodate the recertification window. No bench parameters were touched during the transition. No estimator semantics changed in this entry.
 
+### Review entry 0047 — conditioning bench
+> **Calibration decision (2026-05-25 - MX-2251)** Nadia: duplicate-link collapse is REVERSED. Repeated directed links in the network export come from the acquisition path re-reporting a channel after a probe reset, and the re-report carries the optimistic reading rather than the settled one. Where a directed link (source, target) appears more than once, the surviving weight is the MINIMUM of the reported weights, not the maximum. The self-loop rejection and the 1..9 validity bound recorded in MX-2201 are unchanged; only the duplicate comparison reverses. This supersedes the maximum-collapse rule in MX-2201.
+
+### Review entry 0049 — conditioning bench
+> **Calibration decision (2026-05-25 - MX-2253)** Nadia: duplicate-site damping collapse is REVERSED for the same reason. Where a site appears more than once in the conditioning file, the surviving damping is the MINIMUM of the in-range values, not the maximum. Out-of-range values are still DISCARDED rather than clamped, and sites absent from the file still damp by 0. This supersedes the maximum-collapse rule in MX-2215.
+
+### Review entry 0051 — dispatch bench
+> **Calibration decision (2026-05-26 - MX-2255)** Ilya: dispatch capacity cap. The dispatch list is capped at TWO channels per class. The cap is applied as a final pass over the fully ordered dispatch list, not during admission and not per class before ordering: admit, classify and order every channel as before per MX-2221 and MX-2223, then walk the ordered list from the top keeping the first two channels of each class and discarding the rest. Which channels survive therefore depends on the global ordering chain. `class_counts`, `dispatched_endpoints`, `dispatched_channel_count`, `total_conditioned_flux`, `max_conditioned_flux`, `dispatch_order` and `dispatch_checksum` all describe the dispatch list AFTER the cap.
+
 ### Review entry 0043 — conditioning bench
 > **Calibration decision (2026-05-16 - MX-2215)** Nadia: site conditioning (final) — site damping is read from `/app/data/site_conditioning.json`, an object with a `sites` list of `{site, damping}` entries. This path is FIXED and absolute: `--input` selects the network only and never relocates the conditioning file. Coerce `site` and `damping` to int; DISCARD any entry whose damping falls outside the inclusive range 0..12 (do not clamp it into range); when a site is listed more than once, collapse the repeats keeping the MAXIMUM damping. A site absent from the file damps by 0. This supersedes MX-1925 and MX-2124.
 

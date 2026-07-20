@@ -42,7 +42,8 @@ def _canonical_edges(edge_rows):
         s, t, w = int(s), int(t), int(w)
         if s == t or w < 1 or w > 9:
             continue
-        if t not in edges.get(s, {}) or w > edges[s][t]:
+        # MX-2251: repeated links collapse to the MINIMUM weight.
+        if t not in edges.get(s, {}) or w < edges[s][t]:
             edges.setdefault(s, {})[t] = w
     return edges
 
@@ -245,7 +246,8 @@ def _canonical_damping():
         site, value = int(row["site"]), int(row["damping"])
         if value < 0 or value > 12:
             continue
-        if site not in out or value > out[site]:
+        # MX-2253: repeated sites collapse to the MINIMUM damping.
+        if site not in out or value < out[site]:
             out[site] = value
     return out
 
@@ -281,7 +283,15 @@ def _dispatch_layer(result):
     ordered = sorted(dispatched, key=lambda c: (
         -CLASS_RANK[c["dispatch_class"]], -c["conditioned_flux"], -c["damped_flux"],
         -c["channel_flux"], -c["throughput"], c["hops"], c["endpoint"]))
-    return channels, dispatched, ordered
+    # MX-2255: capacity cap applied AFTER the ordering chain, two per class.
+    kept = {}
+    capped = []
+    for c in ordered:
+        taken = kept.get(c["dispatch_class"], 0)
+        if taken < 2:
+            capped.append(c)
+            kept[c["dispatch_class"]] = taken + 1
+    return channels, capped, capped
 
 
 def test_conditioning_canonicalization_discards_and_collapses():
@@ -299,7 +309,11 @@ def test_conditioning_canonicalization_discards_and_collapses():
             seen.setdefault(s_, []).append(v)
     for site, values in seen.items():
         if len(values) > 1:
-            assert damping[site] == max(values)
+            # MX-2253 reverses this: repeated sites collapse to the MINIMUM.
+            assert damping[site] == min(values)
+            assert damping[site] != max(values), (
+                "the shipped conditioning file must make the two readings differ"
+            )
 
 
 def test_dispatch_admission_matches_independent_computation(result):

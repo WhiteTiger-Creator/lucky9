@@ -25,6 +25,7 @@ WEIGHT_MAX = 9
 CONDITIONING_PATH = Path("/app/data/site_conditioning.json")
 DAMPING_MIN = 0
 DAMPING_MAX = 12
+CLASS_DISPATCH_CAP = 2
 DISPATCH_FLOOR = 7
 CLASS_ORDER = ["primary", "secondary", "tertiary"]
 CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDER)}
@@ -32,14 +33,15 @@ CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDE
 
 def canonical_edges(edge_rows: list[list[int]]) -> dict[int, dict[int, int]]:
     """Normalize edges: drop self-loops and weights outside 1..9, collapse
-    duplicate directed (source,target) rows by maximum weight."""
+    duplicate directed (source,target) rows by MINIMUM weight per MX-2251."""
     edges: dict[int, dict[int, int]] = {}
     for row in edge_rows:
         s, t, w = int(row[0]), int(row[1]), int(row[2])
         if s == t or w < WEIGHT_MIN or w > WEIGHT_MAX:
             continue
         cur = edges.get(s, {}).get(t)
-        if cur is None or w > cur:
+        # MX-2251 reverses this: repeated links collapse to the MINIMUM weight.
+        if cur is None or w < cur:
             edges.setdefault(s, {})[t] = w
     return edges
 
@@ -47,7 +49,7 @@ def canonical_edges(edge_rows: list[list[int]]) -> dict[int, dict[int, int]]:
 def canonical_damping(rows: list[dict]) -> dict[int, int]:
     """Normalize site conditioning per MX-2215: coerce to int, discard damping
     outside the inclusive range 0..12, and collapse repeated site entries
-    keeping the MAXIMUM damping. Sites absent from the file damp by 0."""
+    keeping the MINIMUM damping per MX-2253. Sites absent from the file damp by 0."""
     out: dict[int, int] = {}
     for row in rows:
         try:
@@ -58,7 +60,8 @@ def canonical_damping(rows: list[dict]) -> dict[int, int]:
         if value < DAMPING_MIN or value > DAMPING_MAX:
             continue
         cur = out.get(site)
-        if cur is None or value > cur:
+        # MX-2253 reverses this: repeated sites collapse to the MINIMUM damping.
+        if cur is None or value < cur:
             out[site] = value
     return out
 
@@ -270,6 +273,19 @@ def route_flux(node_count: int, edge_rows: list[list[int]], damping: dict[int, i
         ),
     )
 
+    # MX-2255: capacity cap applied AFTER the ordering chain, two per class.
+    kept_per_class: dict[str, int] = {}
+    capped_dispatch = []
+    for ch in ordered_dispatch:
+        taken = kept_per_class.get(ch["dispatch_class"], 0)
+        if taken < CLASS_DISPATCH_CAP:
+            capped_dispatch.append(ch)
+            kept_per_class[ch["dispatch_class"]] = taken + 1
+    ordered_dispatch = capped_dispatch
+    dispatched = capped_dispatch
+    class_counts = {name: 0 for name in CLASS_ORDER}
+    for ch in dispatched:
+        class_counts[ch["dispatch_class"]] += 1
     dispatch_order = [ch["endpoint"] for ch in ordered_dispatch]
     dispatched_endpoints = sorted(ch["endpoint"] for ch in dispatched)
     dispatched_channel_count = len(dispatched)
