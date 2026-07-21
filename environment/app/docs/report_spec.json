@@ -55,7 +55,7 @@
       "pipeline_terms": [
         "run_class = str(event.get(\"run_class\", \"\"))"
       ],
-      "repair_action": "normalize run_class per PX-3316 and fall back to visitor for any unrecognized value"
+      "repair_action": "normalize run_class per PX-3316 and fall back to adhoc for any unrecognized value"
     },
     {
       "defect_id": "dedupe_exec",
@@ -111,7 +111,7 @@
     "input_stats_types": {
       "raw_exec_count": "integer",
       "unique_exec_ids": "integer",
-      "duplicate_exec_ids": "integer count of raw rows whose id repeats, NOT a list of ids",
+      "duplicate_exec_ids": "integer count of EXCESS duplicate rows = (raw row count) - (distinct id count); NOT a list of ids, and NOT the number of rows that carry a duplicated id",
       "killed_row_count": "integer"
     }
   },
@@ -129,7 +129,17 @@
       "artifacts"
     ],
     "pre_repair_source": "the FROZEN bytes at /app/workflow/.export_report.original, never the live workflow, so the value is identical whether or not a repair already ran",
-    "artifacts_field": "a JSON array of the output file BASENAMES written to the output directory, sorted ascending, and INCLUDING repair_audit.json itself even though it is written last"
+    "artifacts_field": "a JSON array of the output file BASENAMES written to the output directory, sorted ascending, and INCLUDING repair_audit.json itself even though it is written last",
+    "field_types": {
+      "schema_version": "string",
+      "pre_repair_sha256": "string, 64-char hex sha256",
+      "pre_repair_byte_count": "integer",
+      "post_repair_sha256": "string, 64-char hex sha256",
+      "post_repair_byte_count": "integer",
+      "defects_repaired": "JSON array of the defect id strings that were repaired, sorted ascending",
+      "forbidden_tokens_removed": "JSON array of the forbidden token strings removed from the restored workflow, sorted",
+      "artifacts": "JSON array of output basenames, sorted, including repair_audit.json"
+    }
   },
   "workflow_repair": {
     "path": "/app/workflow/export_report.py",
@@ -169,8 +179,8 @@
         "exec_policy_checksum",
         "containment_checksum"
       ],
-      "run_counts": "always enumerates system, service, staff, visitor in that order, emitting 0 for a class with no canonical rows; counts EVERY canonical row including killed ones",
-      "priority_counts": "always enumerates critical, high, standard in that order, emitting 0 for an empty tier",
+      "run_counts": "always enumerates system, service, batch, adhoc in that order, emitting 0 for a class with no canonical rows; counts EVERY canonical row including killed ones",
+      "priority_counts": "always enumerates critical, urgent, normal in that order, emitting 0 for an empty tier",
       "hosts": "JSON array of host names sorted ascending",
       "schema_version_value": "exec-containment-v2"
     },
@@ -208,8 +218,8 @@
       ],
       "incident_id_format": "{host}:{start_ms}-{end_ms}",
       "exec_ids": "JSON array of exec-id strings sorted ascending",
-      "lead_class": "exactly one of the lowercase strings system, service, staff, visitor",
-      "priority": "exactly one of the lowercase strings critical, high, standard"
+      "lead_class": "exactly one of the lowercase strings system, service, batch, adhoc",
+      "priority": "exactly one of the lowercase strings critical, urgent, normal"
     }
   },
   "digest_payloads": {
