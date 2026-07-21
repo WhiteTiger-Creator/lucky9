@@ -110,5 +110,215 @@
     "host": "foxtrot",
     "start_ms": 4210500201900,
     "end_ms": 4210500202000
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "alpha",
+    "start_ms": 4210500004708,
+    "end_ms": 4210500004798
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "alpha",
+    "start_ms": 4210500004758,
+    "end_ms": 4210500004868
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "alpha",
+    "start_ms": 4210500005158,
+    "end_ms": 4210500005248
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "alpha",
+    "start_ms": 4210500005198,
+    "end_ms": 4210500005298
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "alpha",
+    "start_ms": 4210500005596,
+    "end_ms": 4210500005696
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "bravo",
+    "start_ms": 4210500043131,
+    "end_ms": 4210500043221
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "bravo",
+    "start_ms": 4210500043181,
+    "end_ms": 4210500043291
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "bravo",
+    "start_ms": 4210500043581,
+    "end_ms": 4210500043671
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "bravo",
+    "start_ms": 4210500043621,
+    "end_ms": 4210500043721
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "bravo",
+    "start_ms": 4210500044019,
+    "end_ms": 4210500044119
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "charlie",
+    "start_ms": 4210500083636,
+    "end_ms": 4210500083726
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "charlie",
+    "start_ms": 4210500083686,
+    "end_ms": 4210500083796
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "charlie",
+    "start_ms": 4210500084086,
+    "end_ms": 4210500084176
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "charlie",
+    "start_ms": 4210500084126,
+    "end_ms": 4210500084226
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "charlie",
+    "start_ms": 4210500084524,
+    "end_ms": 4210500084624
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "delta",
+    "start_ms": 4210500121993,
+    "end_ms": 4210500122083
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "delta",
+    "start_ms": 4210500122043,
+    "end_ms": 4210500122153
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "delta",
+    "start_ms": 4210500122443,
+    "end_ms": 4210500122533
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "delta",
+    "start_ms": 4210500122483,
+    "end_ms": 4210500122583
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "delta",
+    "start_ms": 4210500122881,
+    "end_ms": 4210500122981
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "echo",
+    "start_ms": 4210500163361,
+    "end_ms": 4210500163451
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "echo",
+    "start_ms": 4210500163411,
+    "end_ms": 4210500163521
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "echo",
+    "start_ms": 4210500163811,
+    "end_ms": 4210500163901
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "echo",
+    "start_ms": 4210500163851,
+    "end_ms": 4210500163951
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "echo",
+    "start_ms": 4210500164249,
+    "end_ms": 4210500164349
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "foxtrot",
+    "start_ms": 4210500202142,
+    "end_ms": 4210500202232
+  },
+  {
+    "layer": "audit",
+    "scope": "all",
+    "host": "foxtrot",
+    "start_ms": 4210500202192,
+    "end_ms": 4210500202302
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "foxtrot",
+    "start_ms": 4210500202592,
+    "end_ms": 4210500202682
+  },
+  {
+    "layer": "audit",
+    "scope": "system",
+    "host": "foxtrot",
+    "start_ms": 4210500202632,
+    "end_ms": 4210500202732
+  },
+  {
+    "layer": "sandbox",
+    "scope": "all",
+    "host": "foxtrot",
+    "start_ms": 4210500203030,
+    "end_ms": 4210500203130
   }
 ]

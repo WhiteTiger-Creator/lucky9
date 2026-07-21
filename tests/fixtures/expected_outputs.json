@@ -2,13 +2,13 @@
   "primary": {
     "summary": {
       "schema_version": "exec-containment-v2",
-      "raw_exec_count": 33,
-      "unique_exec_ids": 29,
-      "canonical_exec_count": 29,
+      "raw_exec_count": 57,
+      "unique_exec_ids": 53,
+      "canonical_exec_count": 53,
       "run_counts": {
-        "system": 7,
+        "system": 19,
         "service": 6,
-        "batch": 9,
+        "batch": 21,
         "adhoc": 7
       },
       "hosts": [
@@ -21,66 +21,66 @@
       ],
       "host_count": 6,
       "killed_excluded_count": 2,
-      "session_count": 23,
-      "total_runtime_ms": 6449,
-      "total_adjusted_runtime_ms": 5830,
-      "total_ledger_runtime_ms": 6613,
-      "total_sandbox_overlap_ms": 968,
-      "total_audit_overlap_ms": 838,
+      "session_count": 47,
+      "total_runtime_ms": 13313,
+      "total_adjusted_runtime_ms": 11961,
+      "total_ledger_runtime_ms": 15822,
+      "total_sandbox_overlap_ms": 2458,
+      "total_audit_overlap_ms": 674,
       "max_ledger_runtime_ms": 491,
       "max_carry_out_ms": 780,
       "longest_session_ms": 611,
-      "contained_count": 11,
+      "contained_count": 12,
       "priority_counts": {
-        "critical": 4,
-        "urgent": 3,
-        "normal": 4
+        "critical": 12,
+        "urgent": 0,
+        "normal": 0
       },
-      "canonical_exec_checksum": "3f64f087401021f67fd51fab418ca75b1b4a915d6466782a369532b71071f910",
-      "exec_policy_checksum": "677232e578996487d77f30e63069d3fa6ca8c6f31d6f561d0f59c52beae7c495",
-      "containment_checksum": "32a9b05e2c05c20d45565b29a338eabd1082268138befcfd7b2ff3e05cfcd3ce"
+      "canonical_exec_checksum": "b680f88630d1939c100eaf63fcda4d3c2f43b635e858d7e3e56810e8eef684b8",
+      "exec_policy_checksum": "a3c195414d0b8962ec528f0fa9b8417da4c224a6a25b411eb723c44822ae1f19",
+      "containment_checksum": "e48a2a9b47262d676635b26e684d373076d8c9b61f2a98a88f526dafde238ddf"
     },
     "matrix": {
       "alpha": {
-        "session_count": 5,
-        "total_runtime_ms": 1635,
-        "total_ledger_runtime_ms": 1856,
+        "session_count": 9,
+        "total_runtime_ms": 2779,
+        "total_ledger_runtime_ms": 3451,
         "max_carry_out_ms": 780,
         "queued_count": 2
       },
       "bravo": {
-        "session_count": 4,
-        "total_runtime_ms": 919,
-        "total_ledger_runtime_ms": 844,
-        "max_carry_out_ms": 364,
+        "session_count": 8,
+        "total_runtime_ms": 2063,
+        "total_ledger_runtime_ms": 2316,
+        "max_carry_out_ms": 780,
         "queued_count": 2
       },
       "charlie": {
-        "session_count": 4,
-        "total_runtime_ms": 1453,
-        "total_ledger_runtime_ms": 1628,
+        "session_count": 8,
+        "total_runtime_ms": 2597,
+        "total_ledger_runtime_ms": 3223,
         "max_carry_out_ms": 780,
         "queued_count": 2
       },
       "delta": {
-        "session_count": 3,
-        "total_runtime_ms": 635,
-        "total_ledger_runtime_ms": 583,
-        "max_carry_out_ms": 313,
-        "queued_count": 1
+        "session_count": 7,
+        "total_runtime_ms": 1779,
+        "total_ledger_runtime_ms": 2032,
+        "max_carry_out_ms": 780,
+        "queued_count": 2
       },
       "echo": {
-        "session_count": 4,
-        "total_runtime_ms": 1094,
-        "total_ledger_runtime_ms": 1028,
-        "max_carry_out_ms": 556,
+        "session_count": 8,
+        "total_runtime_ms": 2238,
+        "total_ledger_runtime_ms": 2678,
+        "max_carry_out_ms": 780,
         "queued_count": 2
       },
       "foxtrot": {
-        "session_count": 3,
-        "total_runtime_ms": 713,
-        "total_ledger_runtime_ms": 674,
-        "max_carry_out_ms": 345,
+        "session_count": 7,
+        "total_runtime_ms": 1857,
+        "total_ledger_runtime_ms": 2122,
+        "max_carry_out_ms": 780,
         "queued_count": 2
       }
     },
@@ -128,6 +128,66 @@
         "burst_digest": "7bac4e2051f6"
       },
       {
+        "incident_id": "echo:4210500164199-4210500164521",
+        "host": "echo",
+        "start_ms": 4210500164199,
+        "end_ms": 4210500164521,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 322,
+        "ledger_runtime_ms": 470,
+        "sandbox_overlap_ms": 0,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 742,
+        "carry_out_ms": 780,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9019"
+        ],
+        "burst_digest": "6f8128c36560"
+      },
+      {
+        "incident_id": "alpha:4210500005546-4210500005868",
+        "host": "alpha",
+        "start_ms": 4210500005546,
+        "end_ms": 4210500005868,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 272,
+        "ledger_runtime_ms": 420,
+        "sandbox_overlap_ms": 100,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 742,
+        "carry_out_ms": 780,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9003"
+        ],
+        "burst_digest": "39d05e8a1124"
+      },
+      {
+        "incident_id": "charlie:4210500084474-4210500084796",
+        "host": "charlie",
+        "start_ms": 4210500084474,
+        "end_ms": 4210500084796,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 272,
+        "ledger_runtime_ms": 420,
+        "sandbox_overlap_ms": 100,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 742,
+        "carry_out_ms": 780,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9011"
+        ],
+        "burst_digest": "a9811f92bec8"
+      },
+      {
         "incident_id": "alpha:4210500004200-4210500004518",
         "host": "alpha",
         "start_ms": 4210500004200,
@@ -148,165 +208,124 @@
         "burst_digest": "af9b2a919440"
       },
       {
-        "incident_id": "foxtrot:4210500200000-4210500200373",
-        "host": "foxtrot",
-        "start_ms": 4210500200000,
-        "end_ms": 4210500200373,
+        "incident_id": "bravo:4210500043969-4210500044291",
+        "host": "bravo",
+        "start_ms": 4210500043969,
+        "end_ms": 4210500044291,
         "lead_class": "system",
         "priority": "critical",
-        "runtime_ms": 373,
-        "adjusted_runtime_ms": 271,
-        "ledger_runtime_ms": 271,
-        "sandbox_overlap_ms": 131,
-        "audit_overlap_ms": 180,
-        "carry_in_ms": 0,
-        "carry_out_ms": 283,
-        "exec_count": 2,
-        "exec_ids": [
-          "px-019",
-          "px-024"
-        ],
-        "burst_digest": "6d77916ebbe3"
-      },
-      {
-        "incident_id": "charlie:4210500082100-4210500082409",
-        "host": "charlie",
-        "start_ms": 4210500082100,
-        "end_ms": 4210500082409,
-        "lead_class": "adhoc",
-        "priority": "urgent",
-        "runtime_ms": 309,
-        "adjusted_runtime_ms": 309,
-        "ledger_runtime_ms": 407,
-        "sandbox_overlap_ms": 0,
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 272,
+        "ledger_runtime_ms": 419,
+        "sandbox_overlap_ms": 100,
         "audit_overlap_ms": 0,
-        "carry_in_ms": 494,
+        "carry_in_ms": 738,
         "carry_out_ms": 780,
         "exec_count": 1,
         "exec_ids": [
-          "px-010"
+          "x9007"
         ],
-        "burst_digest": "844093b16086"
+        "burst_digest": "a84b416ff7ff"
       },
       {
-        "incident_id": "alpha:4210500001900-4210500002231",
-        "host": "alpha",
-        "start_ms": 4210500001900,
-        "end_ms": 4210500002231,
-        "lead_class": "adhoc",
-        "priority": "urgent",
-        "runtime_ms": 331,
-        "adjusted_runtime_ms": 331,
-        "ledger_runtime_ms": 403,
-        "sandbox_overlap_ms": 0,
-        "audit_overlap_ms": 0,
-        "carry_in_ms": 360,
-        "carry_out_ms": 697,
-        "exec_count": 1,
-        "exec_ids": [
-          "px-003"
-        ],
-        "burst_digest": "93f0b77c6b5b"
-      },
-      {
-        "incident_id": "bravo:4210500042600-4210500042941",
-        "host": "bravo",
-        "start_ms": 4210500042600,
-        "end_ms": 4210500042941,
-        "lead_class": "adhoc",
-        "priority": "urgent",
-        "runtime_ms": 341,
-        "adjusted_runtime_ms": 341,
-        "ledger_runtime_ms": 344,
-        "sandbox_overlap_ms": 0,
-        "audit_overlap_ms": 0,
-        "carry_in_ms": 17,
-        "carry_out_ms": 364,
-        "exec_count": 1,
-        "exec_ids": [
-          "px-029"
-        ],
-        "burst_digest": "c9abfa4d3b32"
-      },
-      {
-        "incident_id": "echo:4210500162900-4210500163171",
-        "host": "echo",
-        "start_ms": 4210500162900,
-        "end_ms": 4210500163171,
-        "lead_class": "batch",
-        "priority": "normal",
-        "runtime_ms": 271,
-        "adjusted_runtime_ms": 221,
-        "ledger_runtime_ms": 286,
+        "incident_id": "foxtrot:4210500202980-4210500203302",
+        "host": "foxtrot",
+        "start_ms": 4210500202980,
+        "end_ms": 4210500203302,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 272,
+        "ledger_runtime_ms": 411,
         "sandbox_overlap_ms": 100,
         "audit_overlap_ms": 0,
-        "carry_in_ms": 329,
-        "carry_out_ms": 556,
+        "carry_in_ms": 699,
+        "carry_out_ms": 780,
         "exec_count": 1,
         "exec_ids": [
-          "px-018"
+          "x9023"
         ],
-        "burst_digest": "3116ff78ce3b"
+        "burst_digest": "939d9163f5e6"
       },
       {
-        "incident_id": "delta:4210500120700-4210500120959",
+        "incident_id": "delta:4210500122831-4210500123153",
         "host": "delta",
-        "start_ms": 4210500120700,
-        "end_ms": 4210500120959,
-        "lead_class": "batch",
-        "priority": "normal",
-        "runtime_ms": 259,
-        "adjusted_runtime_ms": 259,
-        "ledger_runtime_ms": 259,
-        "sandbox_overlap_ms": 0,
-        "audit_overlap_ms": 0,
-        "carry_in_ms": 0,
-        "carry_out_ms": 265,
-        "exec_count": 1,
-        "exec_ids": [
-          "px-013"
-        ],
-        "burst_digest": "03c872983c40"
-      },
-      {
-        "incident_id": "bravo:4210500040800-4210500040996",
-        "host": "bravo",
-        "start_ms": 4210500040800,
-        "end_ms": 4210500040996,
-        "lead_class": "service",
-        "priority": "normal",
-        "runtime_ms": 196,
-        "adjusted_runtime_ms": 196,
-        "ledger_runtime_ms": 196,
-        "sandbox_overlap_ms": 0,
-        "audit_overlap_ms": 0,
-        "carry_in_ms": 0,
-        "carry_out_ms": 202,
-        "exec_count": 1,
-        "exec_ids": [
-          "px-006"
-        ],
-        "burst_digest": "cedb24e0dda6"
-      },
-      {
-        "incident_id": "foxtrot:4210500201800-4210500201952",
-        "host": "foxtrot",
-        "start_ms": 4210500201800,
-        "end_ms": 4210500201952,
+        "start_ms": 4210500122831,
+        "end_ms": 4210500123153,
         "lead_class": "system",
-        "priority": "normal",
-        "runtime_ms": 152,
-        "adjusted_runtime_ms": 152,
-        "ledger_runtime_ms": 185,
-        "sandbox_overlap_ms": 0,
+        "priority": "critical",
+        "runtime_ms": 322,
+        "adjusted_runtime_ms": 272,
+        "ledger_runtime_ms": 409,
+        "sandbox_overlap_ms": 100,
         "audit_overlap_ms": 0,
-        "carry_in_ms": 167,
-        "carry_out_ms": 325,
+        "carry_in_ms": 687,
+        "carry_out_ms": 780,
         "exec_count": 1,
         "exec_ids": [
-          "px-021"
+          "x9015"
         ],
-        "burst_digest": "0074521c81d7"
+        "burst_digest": "3a4c9485507e"
+      },
+      {
+        "incident_id": "bravo:4210500043091-4210500043391",
+        "host": "bravo",
+        "start_ms": 4210500043091,
+        "end_ms": 4210500043391,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 300,
+        "adjusted_runtime_ms": 255,
+        "ledger_runtime_ms": 320,
+        "sandbox_overlap_ms": 90,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 326,
+        "carry_out_ms": 587,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9005"
+        ],
+        "burst_digest": "88e4f76e0bad"
+      },
+      {
+        "incident_id": "foxtrot:4210500202102-4210500202402",
+        "host": "foxtrot",
+        "start_ms": 4210500202102,
+        "end_ms": 4210500202402,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 300,
+        "adjusted_runtime_ms": 255,
+        "ledger_runtime_ms": 312,
+        "sandbox_overlap_ms": 90,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 287,
+        "carry_out_ms": 548,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9021"
+        ],
+        "burst_digest": "ced73c33d548"
+      },
+      {
+        "incident_id": "delta:4210500121953-4210500122253",
+        "host": "delta",
+        "start_ms": 4210500121953,
+        "end_ms": 4210500122253,
+        "lead_class": "system",
+        "priority": "critical",
+        "runtime_ms": 300,
+        "adjusted_runtime_ms": 255,
+        "ledger_runtime_ms": 310,
+        "sandbox_overlap_ms": 90,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 275,
+        "carry_out_ms": 536,
+        "exec_count": 1,
+        "exec_ids": [
+          "x9013"
+        ],
+        "burst_digest": "2fa815a08139"
       }
     ]
   },
@@ -348,7 +367,7 @@
         "normal": 3
       },
       "canonical_exec_checksum": "c22589f6f16000b4c3109d7769a257a1a89d21f1569d263b47bbacb07685f7db",
-      "exec_policy_checksum": "677232e578996487d77f30e63069d3fa6ca8c6f31d6f561d0f59c52beae7c495",
+      "exec_policy_checksum": "a3c195414d0b8962ec528f0fa9b8417da4c224a6a25b411eb723c44822ae1f19",
       "containment_checksum": "2af499fa49c8ad9c878aebaf73d463372346edab1552d517743f8a39d3c90423"
     },
     "matrix": {
