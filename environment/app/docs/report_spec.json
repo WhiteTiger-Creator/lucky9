@@ -232,5 +232,8 @@
   "guardrails": {
     "frozen_snapshot": "never modify /app/workflow/.export_report.original",
     "verifier_trees": "never read or import external grading resources"
+  },
+  "inputs": {
+    "control_policies_path": "The sandbox/audit control windows are ALWAYS read from the fixed absolute path /app/data/exec_policies.json. --input reparameterizes only the execution-telemetry stream; the policies path is never derived from the input path and never becomes relative to the input or output directory."
   }
 }
