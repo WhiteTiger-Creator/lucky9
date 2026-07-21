@@ -8,6 +8,7 @@ RUN apt-get update \
         asciinema \
     && rm -rf /var/lib/apt/lists/*
 
+# Fully resolved verifier lock; --no-deps keeps installation deterministic.
 COPY requirements.lock /tmp/requirements.lock
 RUN python3 -m pip install --no-cache-dir --no-deps \
         -r /tmp/requirements.lock
@@ -15,3 +16,5 @@ RUN python3 -m pip install --no-cache-dir --no-deps \
 WORKDIR /app
 
 COPY app/ /app/
+RUN cp /app/workflow/export_report.py /app/workflow/.export_report.original \
+    && chmod a-w /app/workflow/.export_report.original

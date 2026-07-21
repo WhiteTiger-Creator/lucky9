@@ -1,593 +1,387 @@
-"""Verifier for the Meridian-2 flux-routing task.
-
-The agent's /app/flux.py is run against the shipped network and against a
-held-out alternate network. Outputs are checked against exact fixtures and
-against structural invariants (canonical checksums, the packing objective, and
-the strongest-pathway definition).
-"""
+"""Verifier tests for the Warden exec-access containment audit task."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-APP = Path("/app/flux.py")
-DATA = Path("/app/data/network.json")
-TEST_DIR = Path(os.environ.get("TEST_DIR", "/tests"))
-FIX = TEST_DIR / "fixtures"
-EXPECTED = json.loads((FIX / "expected_result.json").read_text())
+AUDIT = Path("/app/exec_audit.py")
+WORKFLOW = Path("/app/workflow/export_report.py")
+FROZEN = Path("/app/workflow/.export_report.original")
+DOSSIER = Path("/app/incident/exec_review_dossier.md")
+SPEC_PATH = Path("/app/docs/report_spec.json")
+EVENTS = Path("/app/data/exec_events.json")
+CONTROLS = Path("/app/data/exec_policies.json")
+FIX = Path("/tests/fixtures")
+ALT_EVENTS = FIX / "alt_exec_events.json"
 
-SOURCE = 0
-HOP_BOUND = 5
+SPEC = json.loads(SPEC_PATH.read_text())
+EXPECTED = json.loads((FIX / "expected_outputs.json").read_text())
+
+CLASS_ORDER = ["system", "service", "batch", "adhoc"]
+PRIORITY_ORDER = ["critical", "urgent", "normal"]
+CLASS_RANK = {n: len(CLASS_ORDER) - i for i, n in enumerate(CLASS_ORDER)}
 
 
-def _run(tmp: Path, input_path: Path = DATA) -> dict:
+def _jsonl(path: Path):
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def _repair(tmp: Path, input_path: Path | None = None) -> Path:
     out = tmp / "out"
+    out.mkdir(parents=True, exist_ok=True)
+    cmd = [sys.executable, str(AUDIT), "repair", "--output-dir", str(out)]
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    if input_path is not None:
+        res = subprocess.run(
+            [sys.executable, str(WORKFLOW), "--input", str(input_path), "--output-dir", str(out)],
+            capture_output=True, text=True)
+        assert res.returncode == 0, res.stderr
+    return out
+
+
+@pytest.fixture(scope="session")
+def repaired(tmp_path_factory) -> Path:
+    return _repair(tmp_path_factory.mktemp("primary"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _hide_expected_fixture():
+    """Keep the expected-output fixture off disk while candidate code runs."""
+    stash = FIX / "expected_outputs.json.hidden"
+    moved = False
+    try:
+        if (FIX / "expected_outputs.json").exists():
+            (FIX / "expected_outputs.json").rename(stash)
+            moved = True
+    except OSError:
+        moved = False
+    try:
+        yield
+    finally:
+        if moved:
+            stash.rename(FIX / "expected_outputs.json")
+
+
+# ----------------------------------------------------------------- CLI ------
+def test_cli_exists():
+    assert AUDIT.exists(), "the audit CLI was not created at /app/exec_audit.py"
+
+
+def test_repair_writes_all_five_artifacts(repaired):
+    names = sorted(p.name for p in repaired.iterdir() if p.is_file())
+    assert names == sorted(["contained.jsonl", "diagnosis.json", "repair_audit.json",
+                     "summary.json", "host_matrix.json"])
+
+
+def test_diagnose_is_stateless(tmp_path):
+    """An explicit diagnose call writes a full report with no prior repair."""
+    report = tmp_path / "d.json"
+    res = subprocess.run(
+        [sys.executable, str(AUDIT), "diagnose", "--dossier", str(DOSSIER), "--report", str(report)],
+        capture_output=True, text=True)
+    assert res.returncode == 0, res.stderr
+    body = json.loads(report.read_text())
+    assert body["defect_count"] == len(SPEC["known_defects"])
+    assert [d["defect_id"] for d in body["defects"]] == sorted(
+        d["defect_id"] for d in SPEC["known_defects"])
+
+
+def test_diagnose_after_repair_still_reports_every_defect(repaired, tmp_path):
+    report = tmp_path / "again.json"
     subprocess.run(
-        [sys.executable, str(APP), "--input", str(input_path), "--output-dir", str(out)],
-        check=True, capture_output=True, text=True,
-    )
-    return json.loads((out / "result.json").read_text())
+        [sys.executable, str(AUDIT), "diagnose", "--dossier", str(DOSSIER), "--report", str(report)],
+        capture_output=True, text=True, check=True)
+    body = json.loads(report.read_text())
+    assert body["defect_count"] == len(SPEC["known_defects"])
 
 
-def _canonical_edges(edge_rows):
-    edges: dict = {}
-    for s, t, w in edge_rows:
-        s, t, w = int(s), int(t), int(w)
-        if s == t or w < 1 or w > 9:
-            continue
-        # MX-2251: repeated links collapse to the MINIMUM weight.
-        if t not in edges.get(s, {}) or w < edges[s][t]:
-            edges.setdefault(s, {})[t] = w
-    return edges
+# ------------------------------------------------------------ diagnosis -----
+def test_diagnosis_schema(repaired):
+    body = json.loads((repaired / "diagnosis.json").read_text())
+    assert set(body) == set(SPEC["diagnosis_report"]["required_keys"])
+    assert body["schema_version"] == SPEC["diagnosis_report"]["schema_version"]
+    assert set(body["input_stats"]) == set(SPEC["diagnosis_report"]["input_stats_keys"])
+    for defect in body["defects"]:
+        assert set(defect) == set(SPEC["diagnosis_report"]["defect_keys"])
 
 
-def _simple_paths(edges):
-    paths = []
-
-    def dfs(node, weight, nodes, depth):
-        for target in sorted(edges.get(node, {})):
-            if target in nodes:
-                continue
-            w = weight + edges[node][target]
-            seq = nodes + (target,)
-            paths.append((w, seq))
-            if depth + 1 < HOP_BOUND:
-                dfs(target, w, seq, depth + 1)
-
-    dfs(SOURCE, 0, (SOURCE,), 0)
-    return paths
+def test_diagnosis_input_stats_match_the_raw_stream(repaired):
+    body = json.loads((repaired / "diagnosis.json").read_text())
+    rows = json.loads(EVENTS.read_text())
+    ids = [str(r.get("exec_id", "")).strip() for r in rows]
+    present = [i for i in ids if i]
+    stats = body["input_stats"]
+    assert stats["raw_exec_count"] == len(rows)
+    assert stats["unique_exec_ids"] == len(set(present))
+    assert stats["duplicate_exec_ids"] == len(present) - len(set(present))
+    assert stats["duplicate_exec_ids"] > 0, "the stream must contain duplicates"
 
 
-def _naive_sum(edge_rows):
-    best = {}
-    for w, seq in _simple_paths(_canonical_edges(edge_rows)):
-        tgt = seq[-1]
-        if tgt == SOURCE:
-            continue
-        if tgt not in best or w > best[tgt]:
-            best[tgt] = w
-    return sum(best.values())
+def test_dossier_quotes_are_verbatim_dossier_lines(repaired):
+    """Evidence must be copied character for character, not paraphrased."""
+    body = json.loads((repaired / "diagnosis.json").read_text())
+    lines = {line.strip() for line in DOSSIER.read_text().splitlines() if line.strip()}
+    for defect in body["defects"]:
+        assert defect["dossier_quote"] in lines, (
+            f"{defect['defect_id']}: dossier_quote is not a verbatim dossier line")
 
 
-@pytest.fixture(scope="module")
-def result(tmp_path_factory) -> dict:
-    """Run the agent's routing once on the shipped network."""
-    assert APP.exists(), "flux.py is missing"
-    return _run(tmp_path_factory.mktemp("primary"))
+def test_pipeline_evidence_comes_from_the_frozen_snapshot(repaired):
+    body = json.loads((repaired / "diagnosis.json").read_text())
+    lines = {line.strip() for line in FROZEN.read_text().splitlines() if line.strip()}
+    for defect in body["defects"]:
+        assert defect["pipeline_evidence"] in lines, (
+            f"{defect['defect_id']}: pipeline_evidence is not a verbatim frozen-snapshot line")
 
 
-def test_result_has_required_keys(result):
-    """result.json carries exactly the contracted key set."""
-    assert set(result) == {"node_count", "reachable", "strongest_path",
-                           "strongest_path_weight", "max_flux",
-                           "flux_paths", "flux_path_count", "flux_node_count",
-                           "residual_flux", "total_path_efficiency",
-                           "max_path_efficiency", "mean_flux_floor",
-                           "saturated_endpoints", "saturated_channel_count",
-                           "max_throughput", "throughput_ledger_checksum",
-                           "total_damping", "total_contention_overlap", "policy_checksum",
-                           "dispatched_endpoints",
-                           "dispatched_channel_count", "total_conditioned_flux",
-                           "max_conditioned_flux", "class_counts",
-                           "dispatch_order", "dispatch_checksum",
-                           "edge_checksum", "flux_checksum"}
+def test_each_defect_cites_the_expected_evidence(repaired):
+    """The quote for a defect must actually contain that defect's search terms."""
+    body = json.loads((repaired / "diagnosis.json").read_text())
+    by_id = {d["defect_id"]: d for d in body["defects"]}
+    for entry in SPEC["known_defects"]:
+        got = by_id[entry["defect_id"]]
+        low = got["dossier_quote"].lower()
+        for term in entry["dossier_terms"]:
+            assert term.lower() in low, f"{entry['defect_id']}: quote misses {term!r}"
+        assert got["stage"] == entry["stage"]
+        assert got["repair_action"] == entry["repair_action"]
 
 
-def test_matches_fixture(result):
-    """The full result matches the reference fixture exactly."""
-    assert result == EXPECTED
-
-
-def test_generalizes_to_alternate_input(tmp_path):
-    """The routing reproduces the reference output for a held-out network."""
-    alt_expected = json.loads((FIX / "alt_expected.json").read_text())
-    got = _run(tmp_path, input_path=FIX / "alt_network.json")
-    assert got == alt_expected
-
-
-def test_edge_checksum_consistent(result):
-    """edge_checksum is the SHA-256 of the canonical-edge serialization."""
-    data = json.loads(DATA.read_text())
-    edges = _canonical_edges(data["edges"])
+def test_diagnosis_checksum_consistent(repaired):
+    body = json.loads((repaired / "diagnosis.json").read_text())
     payload = "\n".join(
-        f"{s}|{t}|{edges[s][t]}" for s in sorted(edges) for t in sorted(edges[s])
-    )
-    assert result["edge_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
+        f"{d['defect_id']}|{d['stage']}|{d['repair_action']}" for d in body["defects"])
+    assert body["diagnosis_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
 
 
-def test_flux_checksum_consistent(result):
-    """flux_checksum is the SHA-256 of the contracted flux payload."""
-    paths = ";".join(">".join(str(n) for n in seq) for seq in result["flux_paths"])
-    payload = (
-        f"{result['node_count']}|{result['max_flux']}|{result['strongest_path_weight']}|"
-        f"{'>'.join(str(n) for n in result['strongest_path'])}|"
-        f"{','.join(str(n) for n in result['reachable'])}|"
-        f"{result['flux_node_count']}|{result['residual_flux']}|"
-        f"{result['total_path_efficiency']}|{result['max_path_efficiency']}|"
-        f"{result['mean_flux_floor']}|"
-        f"{result['saturated_channel_count']}|{result['max_throughput']}|"
-        f"{','.join(str(n) for n in result['saturated_endpoints'])}|"
-        f"{result['total_damping']}|{result['total_conditioned_flux']}|"
-        f"{result['max_conditioned_flux']}|{result['dispatched_channel_count']}|"
-        f"{','.join(str(n) for n in result['dispatch_order'])}|{paths}"
-    )
-    assert result["flux_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
+# ----------------------------------------------------------- repair audit ---
+def test_repair_audit_schema(repaired):
+    audit = json.loads((repaired / "repair_audit.json").read_text())
+    assert set(audit) == set(SPEC["repair_audit"]["required_keys"])
+    assert audit["schema_version"] == SPEC["repair_audit"]["schema_version"]
 
 
-def test_throughput_ledger_consistent(result):
-    """The throughput ledger reproduces the log-governed carry/threshold rule."""
-    data = json.loads(DATA.read_text())
-    edges = _canonical_edges(data["edges"])
-    policy_data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    prev_out, sat, max_tp, rows = 0, [], 0, []
-    for seq in result["flux_paths"]:
-        hops = len(seq) - 1
-        # MX-2261: the carry cap and saturation bar come from the INGRESS HUB's
-        # resolved policy, so they differ between channels.
-        pol = _resolve_policy(seq[1], policy_data) if len(seq) > 1 else _resolve_policy("_", policy_data)
-        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
-        carry_in = max(prev_out - (hops * 5) // 3, 0)
-        throughput = cflux + carry_in // 4
-        carry_out = min(carry_in + cflux - (hops // 2), pol["throughput_cap"])
-        saturated = throughput >= pol["saturation_threshold"]
-        if saturated:
-            sat.append(seq[-1])
-        max_tp = max(max_tp, throughput)
-        rows.append(f"{seq[-1]}|{throughput}|{1 if saturated else 0}|{carry_out}")
-        prev_out = carry_out
-    assert result["saturated_endpoints"] == sorted(sat)
-    assert result["saturated_channel_count"] == len(sat)
-    assert result["max_throughput"] == max_tp
-    assert result["throughput_ledger_checksum"] == hashlib.sha256("\n".join(rows).encode()).hexdigest()
+def test_pre_repair_hash_is_read_from_the_frozen_snapshot(repaired):
+    audit = json.loads((repaired / "repair_audit.json").read_text())
+    raw = FROZEN.read_bytes()
+    assert audit["pre_repair_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert audit["pre_repair_byte_count"] == len(raw)
 
 
-def test_path_efficiency_consistent(result):
-    """The efficiency aggregates are the floored per-hop efficiencies of the routed set."""
-    data = json.loads(DATA.read_text())
-    edges = _canonical_edges(data["edges"])
-    effs = []
-    for seq in result["flux_paths"]:
-        flux = sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
-        effs.append(flux // (len(seq) - 1))
-    assert result["total_path_efficiency"] == sum(effs)
-    assert result["max_path_efficiency"] == (max(effs) if effs else 0)
-    fpc = result["flux_path_count"]
-    assert result["mean_flux_floor"] == (result["max_flux"] // fpc if fpc else 0)
+def test_frozen_snapshot_is_unchanged(repaired):
+    assert FROZEN.read_text() == EXPECTED["frozen_source"]
 
 
-def test_routed_set_is_valid_disjoint_optimal(result):
-    """flux_paths is a vertex-disjoint channel set summing to max_flux."""
-    data = json.loads(DATA.read_text())
-    edges = _canonical_edges(data["edges"])
-    paths = result["flux_paths"]
-    assert paths == sorted(paths), "flux_paths must be sorted ascending"
-    assert result["flux_path_count"] == len(paths)
-    used, total, sites = set(), 0, set()
-    for seq in paths:
-        assert seq[0] == SOURCE, "each channel begins at the source"
-        body = [n for n in seq if n != SOURCE]
-        assert not (set(body) & used), "routed channels are not vertex-disjoint"
-        used |= set(body)
-        sites |= set(body)
-        # channel flux is the sum of its consecutive edge weights
-        total += sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
-    assert total == result["max_flux"], "routed set flux != max_flux"
-    assert result["flux_node_count"] == len(sites)
+def test_post_repair_hash_matches_the_restored_workflow(repaired):
+    audit = json.loads((repaired / "repair_audit.json").read_text())
+    raw = WORKFLOW.read_bytes()
+    assert audit["post_repair_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert audit["post_repair_byte_count"] == len(raw)
+    assert audit["post_repair_sha256"] != audit["pre_repair_sha256"]
 
 
-def test_residual_below_max_flux(result):
-    """residual_flux is a valid packing no larger than max_flux."""
-    assert 0 <= result["residual_flux"] <= result["max_flux"]
+def test_forbidden_tokens_are_gone_from_the_restored_workflow(repaired):
+    source = WORKFLOW.read_text()
+    audit = json.loads((repaired / "repair_audit.json").read_text())
+    for token in SPEC["workflow_repair"]["forbidden_tokens"]:
+        assert token not in source, f"defective construct still present: {token}"
+    assert sorted(audit["forbidden_tokens_removed"]) == sorted(
+        SPEC["workflow_repair"]["forbidden_tokens"])
 
 
-def test_max_flux_is_packing_not_naive_sum(result):
-    """max_flux is the node-disjoint packing, strictly below the naive per-target sum here."""
-    data = json.loads(DATA.read_text())
-    naive = _naive_sum(data["edges"])
-    assert result["max_flux"] <= naive
-    assert result["max_flux"] != naive, "max_flux equals the naive per-target sum (wrong objective)"
-
-
-def test_strongest_path_well_formed(result):
-    """strongest_path starts at the source and its weight is consistent."""
-    assert result["strongest_path"][0] == SOURCE
-    assert isinstance(result["strongest_path_weight"], int)
-    assert result["strongest_path_weight"] >= 0
-
-
-def test_reachable_sorted_distinct(result):
-    """reachable is sorted, distinct, and excludes the source."""
-    r = result["reachable"]
-    assert r == sorted(set(r))
-    assert SOURCE not in r
+def test_audit_lists_every_defect_and_artifact(repaired):
+    audit = json.loads((repaired / "repair_audit.json").read_text())
+    assert sorted(audit["defects_repaired"]) == sorted(
+        d["defect_id"] for d in SPEC["known_defects"])
+    assert set(audit["artifacts"]) >= {
+        "summary.json", "host_matrix.json", "contained.jsonl",
+        "diagnosis.json", "repair_audit.json"}
 
 
 def test_source_does_not_reference_verifier_trees():
-    """The routing source does not read or import verifier artifacts."""
-    src = APP.read_text()
-    for token in ("/tests", "/solution", "expected_result.json", "alt_expected.json"):
-        assert token not in src
+    source = AUDIT.read_text() + WORKFLOW.read_text()
+    for token in ("/tests", "/solution", "expected_outputs.json"):
+        assert token not in source
 
 
-# --- site conditioning / dispatch layer -------------------------------------
-
-CONDITIONING = Path("/app/data/site_conditioning.json")
-CLASS_ORDER = ("primary", "secondary", "tertiary")
-CLASS_RANK = {n: len(CLASS_ORDER) - i for i, n in enumerate(CLASS_ORDER)}
-DISPATCH_FLOOR = 5
+# --------------------------------------------------------------- outputs ----
+def test_summary_matches_fixture(repaired):
+    assert json.loads((repaired / "summary.json").read_text()) == EXPECTED["primary"]["summary"]
 
 
-def _canonical_damping():
-    """MX-2215: discard damping outside 0..12, collapse repeats keeping the MINIMUM per MX-2253."""
-    rows = json.loads(CONDITIONING.read_text())["sites"]
-    out = {}
+def test_host_matrix_matches_fixture(repaired):
+    assert json.loads((repaired / "host_matrix.json").read_text()) == EXPECTED["primary"]["matrix"]
+
+
+def test_contained_queue_matches_fixture(repaired):
+    assert _jsonl(repaired / "contained.jsonl") == EXPECTED["primary"]["queue"]
+
+
+def test_summary_schema(repaired):
+    summary = json.loads((repaired / "summary.json").read_text())
+    assert set(summary) == set(SPEC["outputs"]["summary_json"]["required_keys"])
+    assert list(summary["run_counts"]) == CLASS_ORDER
+    assert list(summary["priority_counts"]) == PRIORITY_ORDER
+    assert summary["hosts"] == sorted(summary["hosts"])
+    for key in ("canonical_exec_checksum", "exec_policy_checksum", "containment_checksum"):
+        assert len(summary[key]) == 64
+
+
+def test_host_matrix_shape(repaired):
+    matrix = json.loads((repaired / "host_matrix.json").read_text())
+    assert isinstance(matrix, dict) and matrix
+    wanted = set(SPEC["outputs"]["host_matrix_json"]["required_keys"])
+    for row in matrix.values():
+        assert set(row) == wanted
+
+
+def test_queue_row_shape_and_vocabulary(repaired):
+    rows = _jsonl(repaired / "contained.jsonl")
+    wanted = set(SPEC["outputs"]["contained_jsonl"]["required_keys"])
     for row in rows:
-        site, value = int(row["site"]), int(row["damping"])
-        if value < 0 or value > 12:
-            continue
-        # MX-2253: repeated sites collapse to the MINIMUM damping.
-        if site not in out or value < out[site]:
-            out[site] = value
-    return out
+        assert set(row) == wanted
+        assert row["lead_class"] in CLASS_ORDER
+        assert row["priority"] in PRIORITY_ORDER
+        assert row["exec_ids"] == sorted(row["exec_ids"])
+        assert row["incident_id"] == f"{row['host']}:{row['start_ms']}-{row['end_ms']}"
 
 
-def _contention_overlaps(result, edges):
-    """MX-2257 attribution: {owner_endpoint: contention_overlap}, computed here
-    independently of the reconciler so the dispatch recomputation stays honest."""
-    paths = []
-
-    def dfs(node, weight, nodes, depth):
-        for target in sorted(edges.get(node, {})):
-            if target in nodes:
-                continue
-            seq = nodes + (target,)
-            paths.append((weight + edges[node][target], seq))
-            if depth + 1 < HOP_BOUND:
-                dfs(target, weight + edges[node][target], seq, depth + 1)
-
-    dfs(SOURCE, 0, (SOURCE,), 0)
-    best = {}
-    for weight, seq in paths:
-        nodes = frozenset(n for n in seq if n != SOURCE)
-        if not nodes:
-            continue
-        cur = best.get(nodes)
-        if cur is None or weight > cur[0] or (weight == cur[0] and seq < cur[1]):
-            best[nodes] = (weight, seq)
-
-    routed = [frozenset(n for n in seq if n != SOURCE) for seq in result["flux_paths"]]
-    endpoints = [seq[-1] for seq in result["flux_paths"]]
-    fluxes = [
-        sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
-        for seq in result["flux_paths"]
-    ]
-    out = {}
-    for nodes in best:
-        if nodes in routed:
-            continue
-        claimants = [i for i, rs in enumerate(routed) if rs & nodes]
-        if not claimants:
-            continue
-        owner = sorted(claimants, key=lambda i: (-fluxes[i], endpoints[i]))[0]
-        out[endpoints[owner]] = out.get(endpoints[owner], 0) + len(routed[owner] & nodes)
-    return out
+def test_contained_jsonl_is_compact(repaired):
+    for line in (repaired / "contained.jsonl").read_text().splitlines():
+        if line.strip():
+            assert ", " not in line and '": ' not in line
 
 
-def _dispatch_layer(result):
-    """Recompute the damping/dispatch layer independently from the routed set."""
-    edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
-    damping = _canonical_damping()
-    policy_data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    prev_out, channels = 0, []
-    for seq in result["flux_paths"]:
-        hops = len(seq) - 1
-        pol = _resolve_policy(seq[1], policy_data) if len(seq) > 1 else _resolve_policy("_", policy_data)
-        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
-        carry_in = max(prev_out - (hops * 5) // 3, 0)
-        throughput = cflux + carry_in // 4
-        prev_out = min(carry_in + cflux - (hops // 2), pol["throughput_cap"])
-        dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
-        channels.append({
-            "endpoint": seq[-1], "hops": hops, "channel_flux": cflux, "seq": seq,
-            "throughput": throughput, "saturated": throughput >= pol["saturation_threshold"],
-            "policy": pol,
-            "damping_sum": dsum,
-        })
-    # MX-2257: contention from unrouted candidates, attributed to a single owner.
-    contention = _contention_overlaps(result, edges)
-    for c in channels:
-        co = contention.get(c["endpoint"], 0)
-        damped = max(c["channel_flux"] - (-(-c["damping_sum"] // 2)) - co, 0)
-        c["contention_overlap"] = co
-        c["damped_flux"] = damped
-        c["conditioned_flux"] = max(damped - (c["hops"] * 3) // 2, 0)
-    dispatched = [c for c in channels if c["conditioned_flux"] >= c["policy"]["dispatch_floor"]]
-    for c in dispatched:
-        if (
-            c["conditioned_flux"] >= c["policy"]["primary_min"]
-            and c["damping_sum"] <= c["policy"]["primary_damping_max"]
-        ) or (c["saturated"] and c["hops"] <= 1):
-            c["dispatch_class"] = "primary"
-        elif c["saturated"] or c["damped_flux"] >= 12:
-            c["dispatch_class"] = "secondary"
-        else:
-            c["dispatch_class"] = "tertiary"
-    ordered = sorted(dispatched, key=lambda c: (
-        -CLASS_RANK[c["dispatch_class"]], -c["conditioned_flux"], -c["damped_flux"],
-        -c["channel_flux"], -c["throughput"], c["hops"], c["endpoint"]))
-    # MX-2255: capacity cap applied AFTER the ordering chain, two per class.
-    kept = {}
-    capped = []
-    for c in ordered:
-        taken = kept.get(c["dispatch_class"], 0)
-        if taken < 2:
-            capped.append(c)
-            kept[c["dispatch_class"]] = taken + 1
-    return channels, capped, capped
+# ------------------------------------------------------------- behaviour ----
+def test_run_counts_cover_every_canonical_row_including_killed(repaired):
+    summary = json.loads((repaired / "summary.json").read_text())
+    assert sum(summary["run_counts"].values()) == summary["canonical_exec_count"]
+    assert summary["killed_excluded_count"] > 0, "the stream must contain killed execs"
 
 
-def test_conditioning_canonicalization_discards_and_collapses():
-    """Out-of-range damping is discarded (not clamped) and repeated sites collapse by the MINIMUM."""
-    raw = json.loads(CONDITIONING.read_text())["sites"]
-    damping = _canonical_damping()
-    for row in raw:
-        if int(row["damping"]) > 12 or int(row["damping"]) < 0:
-            # a clamping implementation would have recorded the bound instead
-            assert damping.get(int(row["site"])) != 12
-    seen = {}
-    for row in raw:
-        s_, v = int(row["site"]), int(row["damping"])
-        if 0 <= v <= 12:
-            seen.setdefault(s_, []).append(v)
-    for site, values in seen.items():
-        if len(values) > 1:
-            # MX-2253 reverses this: repeated sites collapse to the MINIMUM.
-            assert damping[site] == min(values)
-            assert damping[site] != max(values), (
-                "the shipped conditioning file must make the two readings differ"
-            )
+def test_duplicate_execs_are_collapsed_before_aggregates(repaired):
+    summary = json.loads((repaired / "summary.json").read_text())
+    rows = json.loads(EVENTS.read_text())
+    assert summary["raw_exec_count"] == len(rows)
+    assert summary["canonical_exec_count"] < summary["raw_exec_count"]
+    assert summary["canonical_exec_count"] == summary["unique_exec_ids"]
 
 
-def test_dispatch_admission_matches_independent_computation(result):
-    """The dispatched set is exactly the routed channels whose conditioned flux clears the floor."""
-    _, dispatched, _ = _dispatch_layer(result)
-    assert result["dispatched_endpoints"] == sorted(c["endpoint"] for c in dispatched)
-    assert result["dispatched_channel_count"] == len(dispatched)
-    assert result["total_conditioned_flux"] == sum(c["conditioned_flux"] for c in dispatched)
-    assert result["max_conditioned_flux"] == max((c["conditioned_flux"] for c in dispatched), default=0)
+def test_unknown_run_class_falls_back_to_visitor(repaired):
+    """PX-3316: an unrecognized class becomes visitor, the LOWEST class."""
+    rows = json.loads(EVENTS.read_text())
+    unknown = [r for r in rows
+               if str(r.get("run_class", "")).strip().lower() not in CLASS_RANK]
+    assert unknown, "the stream must contain an unrecognized exec class"
+    summary = json.loads((repaired / "summary.json").read_text())
+    assert summary["run_counts"]["adhoc"] >= len(unknown)
 
 
-def test_damping_half_rounds_up_not_down(result):
-    """The accumulated damping is halved with a CEILING; a floored halving gives a different set."""
-    edges = _canonical_edges(json.loads(DATA.read_text())["edges"])
-    damping = _canonical_damping()
-    floored = []
-    for seq in result["flux_paths"]:
-        hops = len(seq) - 1
-        cflux = sum(edges[seq[i]][seq[i + 1]] for i in range(hops))
-        dsum = sum(damping.get(n, 0) for n in seq if n != SOURCE)
-        cond = max(max(cflux - (dsum // 2), 0) - (hops * 3) // 2, 0)
-        if cond >= DISPATCH_FLOOR:
-            floored.append(seq[-1])
-    # The shipped network is tuned so the two roundings genuinely disagree.
-    assert sorted(floored) != result["dispatched_endpoints"]
+def test_killed_execs_open_no_session(repaired):
+    """PX-3322: killed rows are excluded from sessions but still counted."""
+    rows = json.loads(EVENTS.read_text())
+    killed_ids = {
+        str(r["exec_id"]).strip() for r in rows
+        if r.get("killed") is True
+        or (isinstance(r.get("killed"), str) and r["killed"].strip().lower() in {"true", "1", "yes"})
+    }
+    assert killed_ids
+    for row in _jsonl(repaired / "contained.jsonl"):
+        assert not (set(row["exec_ids"]) & killed_ids)
 
 
-def test_total_damping_covers_all_routed_channels(result):
-    """total_damping sums damping over every routed channel, not only the dispatched ones."""
-    channels, dispatched, _ = _dispatch_layer(result)
-    assert result["total_damping"] == sum(c["damping_sum"] for c in channels)
-    assert result["total_damping"] != sum(c["damping_sum"] for c in dispatched)
+def test_sandbox_and_audit_overlaps_are_reported_unadjusted(repaired):
+    """PX-3328 changes the subtraction only; both overlaps are reported raw."""
+    summary = json.loads((repaired / "summary.json").read_text())
+    assert summary["total_sandbox_overlap_ms"] > 0
+    assert summary["total_audit_overlap_ms"] > 0
+    assert summary["total_adjusted_runtime_ms"] < summary["total_runtime_ms"]
 
 
-def test_class_counts_enumerate_all_three(result):
-    """class_counts always carries all three class names in order, zero-filled."""
-    assert list(result["class_counts"]) == list(CLASS_ORDER)
-    _, dispatched, _ = _dispatch_layer(result)
-    expected = {n: 0 for n in CLASS_ORDER}
-    for c in dispatched:
-        expected[c["dispatch_class"]] += 1
-    assert result["class_counts"] == expected
-    assert sum(result["class_counts"].values()) == result["dispatched_channel_count"]
+def test_carry_out_never_exceeds_the_retuned_cap(repaired):
+    """PX-3324 retuned the carry-out cap; the superseded 2000 ms bound is not it."""
+    summary = json.loads((repaired / "summary.json").read_text())
+    assert summary["max_carry_out_ms"] <= 780
+    assert summary["max_carry_out_ms"] > 0
 
 
-def test_dispatch_order_follows_the_ordering_chain(result):
-    """dispatch_order applies the full tie-break chain and is not merely ascending."""
-    _, _, ordered = _dispatch_layer(result)
-    assert result["dispatch_order"] == [c["endpoint"] for c in ordered]
-    assert result["dispatch_order"] != sorted(result["dispatch_order"])
-    assert sorted(result["dispatch_order"]) == result["dispatched_endpoints"]
+def test_queue_follows_the_pac_3334_ordering_chain(repaired):
+    rows = _jsonl(repaired / "contained.jsonl")
+    rank = {n: len(PRIORITY_ORDER) - i for i, n in enumerate(PRIORITY_ORDER)}
+    keys = [(-rank[r["priority"]], -r["ledger_runtime_ms"], -r["runtime_ms"],
+             -r["exec_count"], r["host"], r["start_ms"]) for r in rows]
+    assert keys == sorted(keys), "queue is not in the governing order"
+    assert [r["start_ms"] for r in rows] != sorted(r["start_ms"] for r in rows) or len(rows) < 3
 
 
-def test_dispatch_checksum_consistent(result):
-    """dispatch_checksum is the SHA-256 of the dispatch-row serialization."""
-    _, _, ordered = _dispatch_layer(result)
+def test_host_capacity_cap_applied_after_ordering(repaired):
+    """PX-3330: at most two rows per host, retained by the GLOBAL order."""
+    rows = _jsonl(repaired / "contained.jsonl")
+    per_host: dict[str, int] = {}
+    for row in rows:
+        per_host[row["host"]] = per_host.get(row["host"], 0) + 1
+    assert per_host and max(per_host.values()) <= 2
+    assert any(v == 2 for v in per_host.values()), "the cap never binds"
+
+
+def test_admission_floor_is_per_class(repaired):
+    """PX-3332: every admitted session clears its own class floor."""
+    floors = {"system": 150, "service": 190, "batch": 240, "adhoc": 300}
+    for row in _jsonl(repaired / "contained.jsonl"):
+        assert row["ledger_runtime_ms"] >= floors[row["lead_class"]]
+
+
+def test_burst_digest_consistent(repaired):
+    for row in _jsonl(repaired / "contained.jsonl"):
+        payload = (f"{row['host']}|{row['start_ms']}|{row['end_ms']}"
+                   f"|{','.join(row['exec_ids'])}|{row['lead_class']}|{row['ledger_runtime_ms']}")
+        assert row["burst_digest"] == hashlib.sha256(payload.encode()).hexdigest()[:12]
+
+
+def test_containment_checksum_consistent(repaired):
+    summary = json.loads((repaired / "summary.json").read_text())
+    rows = _jsonl(repaired / "contained.jsonl")
     payload = "\n".join(
-        f"{c['endpoint']}|{c['dispatch_class']}|{c['conditioned_flux']}|"
-        f"{c['damped_flux']}|{c['damping_sum']}" for c in ordered)
-    assert result["dispatch_checksum"] == hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        f"{r['incident_id']}|{r['priority']}|{r['ledger_runtime_ms']}|{r['burst_digest']}" for r in rows)
+    assert summary["containment_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
 
 
-def test_conditioning_path_is_fixed_not_relative_to_input(tmp_path):
-    """--input selects the network only; the conditioning file is never relocated."""
-    alt = FIX / "alt_network.json"
-    staged = tmp_path / "network.json"
-    staged.write_text(alt.read_text())
-    # A decoy conditioning file beside the staged input must be ignored.
-    (tmp_path / "site_conditioning.json").write_text(
-        json.dumps({"sites": [{"site": n, "damping": 12} for n in range(1, 18)]}))
-    got = _run(tmp_path / "run", input_path=staged)
-    alt_expected = json.loads((FIX / "alt_expected.json").read_text())
-    assert got == alt_expected
+def test_exec_policy_checksum_consistent(repaired):
+    summary = json.loads((repaired / "summary.json").read_text())
+    controls = json.loads(CONTROLS.read_text())
+    ordered = sorted(controls, key=lambda r: (
+        str(r["layer"]), str(r["scope"]), str(r["host"]).strip().lower(), int(r["start_ms"])))
+    payload = "\n".join(
+        f"{r['layer']}|{r['scope']}|{str(r['host']).strip().lower()}|{int(r['start_ms'])}|{int(r['end_ms'])}"
+        for r in ordered)
+    assert summary["exec_policy_checksum"] == hashlib.sha256(payload.encode()).hexdigest()
 
 
-def test_mx_2257_owner_counts_only_its_own_intersection(result):
-    """MX-2257: the owning routed channel adds |own_sites & candidate_sites|, no more.
-
-    Three readings of the attribution rule are possible and the wrong two overstate
-    the total. This recomputes the candidate set independently from the network and
-    pins the governing reading, asserting the alternatives genuinely differ so the
-    check cannot pass tautologically -- and so the rule cannot go dormant unnoticed.
-    """
-    net = json.loads(DATA.read_text())
-    edges: dict[int, dict[int, int]] = {}
-    for src, dst, w in net["edges"]:
-        if src == dst or not 1 <= w <= 9:   # canonicalization drops these
-            continue
-        cur = edges.setdefault(src, {}).get(dst)
-        if cur is None or w < cur:          # MX-2251: minimum weight wins
-            edges[src][dst] = w
-
-    paths: list[tuple[int, tuple[int, ...]]] = []
-
-    def dfs(node, weight, nodes, depth):
-        for target in sorted(edges.get(node, {})):
-            if target in nodes:
-                continue
-            seq = nodes + (target,)
-            paths.append((weight + edges[node][target], seq))
-            if depth + 1 < HOP_BOUND:
-                dfs(target, weight + edges[node][target], seq, depth + 1)
-
-    dfs(SOURCE, 0, (SOURCE,), 0)
-
-    best: dict[frozenset, tuple[int, tuple]] = {}
-    for weight, seq in paths:
-        nodes = frozenset(n for n in seq if n != SOURCE)
-        if not nodes:
-            continue
-        cur = best.get(nodes)
-        if cur is None or weight > cur[0] or (weight == cur[0] and seq < cur[1]):
-            best[nodes] = (weight, seq)
-
-    routed = [frozenset(n for n in seq if n != SOURCE) for seq in result["flux_paths"]]
-    endpoints = [seq[-1] for seq in result["flux_paths"]]
-    fluxes = [
-        sum(edges[seq[i]][seq[i + 1]] for i in range(len(seq) - 1))
-        for seq in result["flux_paths"]
-    ]
-    candidates = [nodes for nodes in best if nodes not in routed]
-
-    governing = every_claimant = owner_absorbs_all = 0
-    multi_claimant = 0
-    for cand in candidates:
-        claimants = [i for i, rs in enumerate(routed) if rs & cand]
-        if not claimants:
-            continue
-        if len(claimants) > 1:
-            multi_claimant += 1
-        owner = sorted(claimants, key=lambda i: (-fluxes[i], endpoints[i]))[0]
-        governing += len(routed[owner] & cand)
-        shared_any = set()
-        for i in claimants:
-            shared_any |= routed[i] & cand
-            every_claimant += len(routed[i] & cand)
-        owner_absorbs_all += len(shared_any)
-
-    assert result["total_contention_overlap"] == governing
-    assert multi_claimant > 0, "no candidate has multiple claimants -- MX-2257 is dormant"
-    assert governing < owner_absorbs_all, "readings coincide -- test cannot discriminate"
-    assert governing < every_claimant, "readings coincide -- test cannot discriminate"
+# --------------------------------------------------------- generalization ---
+def test_repair_is_idempotent(tmp_path):
+    first = _repair(tmp_path / "a")
+    second = _repair(tmp_path / "b")
+    for name in ("summary.json", "host_matrix.json", "contained.jsonl"):
+        assert (first / name).read_text() == (second / name).read_text()
 
 
-POLICY_PATH = Path("/app/data/transport_policies.json")
-POLICY_FIELDS = (
-    "dispatch_floor", "primary_min", "primary_damping_max",
-    "saturation_threshold", "throughput_cap",
-)
-BASELINE_POLICY = {
-    "dispatch_floor": 5, "primary_min": 6, "primary_damping_max": 7,
-    "saturation_threshold": 20, "throughput_cap": 60,
-}
+def test_generalizes_to_alternate_stream(tmp_path):
+    out = _repair(tmp_path / "alt", input_path=ALT_EVENTS)
+    assert json.loads((out / "summary.json").read_text()) == EXPECTED["alternate"]["summary"]
+    assert json.loads((out / "host_matrix.json").read_text()) == EXPECTED["alternate"]["matrix"]
+    assert _jsonl(out / "contained.jsonl") == EXPECTED["alternate"]["queue"]
 
 
-def _resolve_policy(hub, data):
-    base = dict(BASELINE_POLICY)
-    for k in POLICY_FIELDS:
-        if k in data.get("default", {}):
-            base[k] = int(data["default"][k])
-    raw = data.get("hub_overrides", {}).get(str(hub))
-    if not isinstance(raw, dict):
-        return base
-    merged = dict(base)
-    for k in POLICY_FIELDS:
-        if k in raw:
-            merged[k] = int(raw[k])
-    return merged
-
-
-def test_policy_source_path_affects_output(tmp_path: Path):
-    """MX-2261: thresholds come from the policy file, not from hardcoded constants."""
-    original = POLICY_PATH.read_text(encoding="utf-8")
-    try:
-        baseline = _run(tmp_path / "base")
-        bumped = json.loads(original)
-        bumped["default"]["dispatch_floor"] = 99
-        POLICY_PATH.write_text(json.dumps(bumped), encoding="utf-8")
-        changed = _run(tmp_path / "changed")
-        assert changed["dispatched_channel_count"] < baseline["dispatched_channel_count"]
-        assert changed["policy_checksum"] != baseline["policy_checksum"]
-    finally:
-        POLICY_PATH.write_text(original, encoding="utf-8")
-
-
-def test_sparse_hub_override_inherits_remaining_fields():
-    """A hub override names some fields; every unlisted field is inherited."""
-    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    sparse = [h for h, v in data["hub_overrides"].items() if len(v) < len(POLICY_FIELDS)]
-    assert sparse, "no sparse override -- the inheritance rule is dormant"
-    for hub in sparse:
-        resolved = _resolve_policy(hub, data)
-        assert set(resolved) == set(POLICY_FIELDS)
-        for key in POLICY_FIELDS:
-            if key not in data["hub_overrides"][hub]:
-                expected = int(data["default"].get(key, BASELINE_POLICY[key]))
-                assert resolved[key] == expected, f"{hub}.{key} did not inherit"
-
-
-def test_policy_default_may_omit_fields_and_falls_back_to_baseline():
-    """The file default is itself partial; omitted fields keep the shipped baseline."""
-    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    omitted = [k for k in POLICY_FIELDS if k not in data.get("default", {})]
-    assert omitted, "file default names every field -- the baseline tier is dormant"
-    for key in omitted:
-        assert _resolve_policy("no-such-hub", data)[key] == BASELINE_POLICY[key]
-
-
-def test_policy_checksum_consistent(result):
-    """policy_checksum serializes the RESOLVED values, default then hubs ascending."""
-    data = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    base = _resolve_policy("no-such-hub", data)
-    lines = ["default|" + "|".join(str(base[k]) for k in POLICY_FIELDS)]
-    for hub in sorted(data.get("hub_overrides", {}), key=lambda h: int(h)):
-        resolved = _resolve_policy(hub, data)
-        lines.append(f"{hub}|" + "|".join(str(resolved[k]) for k in POLICY_FIELDS))
-    expected = hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
-    assert result["policy_checksum"] == expected
+def test_custom_output_dir_is_honoured(tmp_path):
+    out = tmp_path / "elsewhere"
+    subprocess.run([sys.executable, str(AUDIT), "repair", "--output-dir", str(out)],
+                   capture_output=True, text=True, check=True)
+    assert (out / "summary.json").exists()
+    assert (out / "repair_audit.json").exists()

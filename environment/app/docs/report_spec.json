@@ -1,0 +1,225 @@
+{
+  "title": "Warden Badge-Access Containment Rollup \u2014 Output Contract",
+  "version": "3.0",
+  "semantics_source": "This document fixes FORMAT only: file names, key sets, value vocabulary and checksum serialization. Every rule that decides a VALUE \u2014 normalization, deduplication, session stitching, control-window scope and precedence, the occupancy ledger, admission, priority and ordering \u2014 is settled in /app/incident/exec_review_dossier.md. Where the dossier revisits a point, the latest dated decision governs.",
+  "cli": {
+    "path": "/app/exec_audit.py",
+    "diagnose": "python3 /app/exec_audit.py diagnose --dossier PATH --report PATH",
+    "repair": "python3 /app/exec_audit.py repair --output-dir PATH",
+    "diagnose_is_stateless": "Every explicit diagnose call writes a full report regardless of workflow state or of any earlier repair."
+  },
+  "known_defects": [
+    {
+      "defect_id": "admission_filter",
+      "stage": "containment_admission",
+      "dossier_terms": [
+        "PX-3332",
+        "admission floor"
+      ],
+      "pipeline_terms": [
+        "if event.get(\"run_class\") == \"system\""
+      ],
+      "repair_action": "admit sessions by the per-class admission floor of PX-3332 instead of a run_class equality test"
+    },
+    {
+      "defect_id": "wrong_entry_field",
+      "stage": "canonicalization",
+      "dossier_terms": [
+        "PX-3314",
+        "started_ms"
+      ],
+      "pipeline_terms": [
+        "event[\"granted_at\"]"
+      ],
+      "repair_action": "read the entry timestamp from started_ms as PX-3314 requires, not from granted_at"
+    },
+    {
+      "defect_id": "queue_ordering",
+      "stage": "queue_ordering",
+      "dossier_terms": [
+        "PX-3334",
+        "ordered strictly"
+      ],
+      "pipeline_terms": [
+        "contained.sort(key=lambda row: row[\"entered_ms\"])"
+      ],
+      "repair_action": "order the containment queue by the PX-3334 chain, not ascending entry time"
+    },
+    {
+      "defect_id": "run_class_normalization",
+      "stage": "canonicalization",
+      "dossier_terms": [
+        "PX-3316",
+        "falls back"
+      ],
+      "pipeline_terms": [
+        "run_class = str(event.get(\"run_class\", \"\"))"
+      ],
+      "repair_action": "normalize run_class per PX-3316 and fall back to visitor for any unrecognized value"
+    },
+    {
+      "defect_id": "dedupe_exec",
+      "stage": "deduplication",
+      "dossier_terms": [
+        "PX-3318",
+        "duplicate"
+      ],
+      "pipeline_terms": [
+        "unique_exec_ids"
+      ],
+      "repair_action": "collapse repeated exec_id rows per PX-3318 before any aggregate is computed"
+    },
+    {
+      "defect_id": "killed_filter",
+      "stage": "session_construction",
+      "dossier_terms": [
+        "PX-3322",
+        "killed"
+      ],
+      "pipeline_terms": [
+        "\"killed_excluded_count\": 0"
+      ],
+      "repair_action": "exclude killed execs from session construction per PX-3322 while still counting them in run_counts"
+    }
+  ],
+  "diagnosis_report": {
+    "output_name": "diagnosis.json",
+    "schema_version": "warden-diagnosis-v2",
+    "required_keys": [
+      "schema_version",
+      "input_stats",
+      "defect_count",
+      "defects",
+      "diagnosis_checksum"
+    ],
+    "input_stats_keys": [
+      "raw_exec_count",
+      "unique_exec_ids",
+      "duplicate_exec_ids",
+      "killed_row_count"
+    ],
+    "defect_keys": [
+      "defect_id",
+      "stage",
+      "dossier_quote",
+      "pipeline_evidence",
+      "repair_action"
+    ],
+    "ordering": "defects sorted by defect_id ascending",
+    "evidence_contract": "dossier_quote is a line from the dossier copied VERBATIM, character for character, with surrounding whitespace stripped and nothing else altered; pipeline_evidence is likewise a verbatim stripped line from the FROZEN snapshot at /app/workflow/.export_report.original.",
+    "diagnosis_checksum": "sha256 over one line per defect in defect_id order, 'defect_id|stage|repair_action', joined by newline",
+    "input_stats_types": {
+      "raw_exec_count": "integer",
+      "unique_exec_ids": "integer",
+      "duplicate_exec_ids": "integer count of raw rows whose id repeats, NOT a list of ids",
+      "killed_row_count": "integer"
+    }
+  },
+  "repair_audit": {
+    "output_name": "repair_audit.json",
+    "schema_version": "warden-repair-v2",
+    "required_keys": [
+      "schema_version",
+      "pre_repair_sha256",
+      "pre_repair_byte_count",
+      "post_repair_sha256",
+      "post_repair_byte_count",
+      "defects_repaired",
+      "forbidden_tokens_removed",
+      "artifacts"
+    ],
+    "pre_repair_source": "the FROZEN bytes at /app/workflow/.export_report.original, never the live workflow, so the value is identical whether or not a repair already ran",
+    "artifacts_field": "a JSON array of the output file BASENAMES written to the output directory, sorted ascending, and INCLUDING repair_audit.json itself even though it is written last"
+  },
+  "workflow_repair": {
+    "path": "/app/workflow/export_report.py",
+    "frozen_snapshot": "/app/workflow/.export_report.original",
+    "forbidden_tokens": [
+      "event[\"granted_at\"]",
+      "if event.get(\"run_class\") == \"system\"",
+      "contained.sort(key=lambda row: row[\"entered_ms\"])",
+      "\"killed_excluded_count\": 0"
+    ],
+    "generalization_contract": "Graded on behaviour, not source text. The repaired workflow must derive every value from the inputs and the governing decisions, accept an alternate exec stream via --input, and produce identical output on reruns. No particular identifiers or code structure are required."
+  },
+  "outputs": {
+    "summary_json": {
+      "output_name": "summary.json",
+      "required_keys": [
+        "schema_version",
+        "raw_exec_count",
+        "unique_exec_ids",
+        "canonical_exec_count",
+        "run_counts",
+        "hosts",
+        "host_count",
+        "killed_excluded_count",
+        "session_count",
+        "total_runtime_ms",
+        "total_adjusted_runtime_ms",
+        "total_ledger_runtime_ms",
+        "total_sandbox_overlap_ms",
+        "total_audit_overlap_ms",
+        "max_ledger_runtime_ms",
+        "max_carry_out_ms",
+        "longest_session_ms",
+        "contained_count",
+        "priority_counts",
+        "canonical_exec_checksum",
+        "exec_policy_checksum",
+        "containment_checksum"
+      ],
+      "run_counts": "always enumerates system, service, staff, visitor in that order, emitting 0 for a class with no canonical rows; counts EVERY canonical row including killed ones",
+      "priority_counts": "always enumerates critical, high, standard in that order, emitting 0 for an empty tier",
+      "hosts": "JSON array of host names sorted ascending",
+      "schema_version_value": "exec-containment-v2"
+    },
+    "host_matrix_json": {
+      "output_name": "host_matrix.json",
+      "shape": "JSON object keyed by host name; each value carries exactly the keys below",
+      "required_keys": [
+        "session_count",
+        "total_runtime_ms",
+        "total_ledger_runtime_ms",
+        "max_carry_out_ms",
+        "queued_count"
+      ]
+    },
+    "contained_jsonl": {
+      "output_name": "contained.jsonl",
+      "shape": "one compact JSON object per line, separators (',',':'), in the dossier's queue order",
+      "required_keys": [
+        "incident_id",
+        "host",
+        "start_ms",
+        "end_ms",
+        "lead_class",
+        "priority",
+        "runtime_ms",
+        "adjusted_runtime_ms",
+        "ledger_runtime_ms",
+        "sandbox_overlap_ms",
+        "audit_overlap_ms",
+        "carry_in_ms",
+        "carry_out_ms",
+        "exec_count",
+        "exec_ids",
+        "burst_digest"
+      ],
+      "incident_id_format": "{host}:{start_ms}-{end_ms}",
+      "exec_ids": "JSON array of exec-id strings sorted ascending",
+      "lead_class": "exactly one of the lowercase strings system, service, staff, visitor",
+      "priority": "exactly one of the lowercase strings critical, high, standard"
+    }
+  },
+  "digest_payloads": {
+    "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms')",
+    "canonical_exec_checksum": "sha256 over one line per canonical row in emitted order, 'exec_id|image_ref|run_class|host|started_ms|ended_ms|killed_as_1_or_0'. Emitted order is the canonical rows sorted by (host, started_ms, exec_id) ascending.",
+    "exec_policy_checksum": "sha256 over one line per control window, 'layer|scope|host|start_ms|end_ms', ordered by layer, then scope, then host, then start_ms",
+    "containment_checksum": "sha256 over one line per queue row in queue order, 'incident_id|priority|ledger_runtime_ms|burst_digest'"
+  },
+  "guardrails": {
+    "frozen_snapshot": "never modify /app/workflow/.export_report.original",
+    "verifier_trees": "never read or import external grading resources"
+  }
+}

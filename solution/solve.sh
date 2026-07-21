@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp "${SCRIPT_DIR}/flux_ref.py" /app/flux.py
-python3 /app/flux.py --output-dir /app/output
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+cp "${SCRIPT_DIR}/exec_audit.py" /app/exec_audit.py
+python3 /app/exec_audit.py repair --output-dir /app/output
