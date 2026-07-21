@@ -245,7 +245,7 @@ DISPATCH_FLOOR = 5
 
 
 def _canonical_damping():
-    """MX-2215: discard damping outside 0..12, collapse repeats keeping MAXIMUM."""
+    """MX-2215: discard damping outside 0..12, collapse repeats keeping the MINIMUM per MX-2253."""
     rows = json.loads(CONDITIONING.read_text())["sites"]
     out = {}
     for row in rows:
@@ -354,7 +354,7 @@ def _dispatch_layer(result):
 
 
 def test_conditioning_canonicalization_discards_and_collapses():
-    """Out-of-range damping is discarded (not clamped) and repeated sites collapse by MAXIMUM."""
+    """Out-of-range damping is discarded (not clamped) and repeated sites collapse by the MINIMUM."""
     raw = json.loads(CONDITIONING.read_text())["sites"]
     damping = _canonical_damping()
     for row in raw:
