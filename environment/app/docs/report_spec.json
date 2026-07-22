@@ -123,6 +123,7 @@
     ],
     "defect_keys_annotated": [
       "defect_id: string",
+      "stage: string - the pipeline stage the defect belongs to, exactly as listed for that defect in known_defects",
       "dossier_quote: string - ONE verbatim line from the dossier, whitespace-stripped. Not a list, not a dict.",
       "pipeline_evidence: string - ONE verbatim stripped line from the FROZEN snapshot. Not a list, not a dict.",
       "repair_action: string"
