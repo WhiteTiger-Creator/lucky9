@@ -227,7 +227,14 @@
     "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms')",
     "canonical_exec_checksum": "sha256 over one line per canonical row in emitted order, 'exec_id|image_ref|run_class|host|started_ms|ended_ms|killed_as_1_or_0'. Emitted order is the canonical rows sorted by (host, started_ms, exec_id) ascending.",
     "exec_policy_checksum": "sha256 over one line per control window, 'layer|scope|host|start_ms|end_ms', ordered by layer, then scope, then host, then start_ms",
-    "containment_checksum": "sha256 over one line per queue row in queue order, 'incident_id|priority|ledger_runtime_ms|burst_digest'"
+    "containment_checksum": "sha256 over one line per queue row in queue order, 'incident_id|priority|ledger_runtime_ms|burst_digest'",
+    "serialization_contract": {
+      "text_encoding": "UTF-8",
+      "field_delimiter": "|",
+      "row_delimiter": "one LF character (\\n) BETWEEN rows",
+      "trailing_delimiter": "none: do NOT append a newline or pipe after the final row. The payload is exactly '\\n'.join(rows) - it does not end in a newline.",
+      "empty_input": "when there are no rows the payload is the empty string, and the digest is sha256 of the empty string"
+    }
   },
   "guardrails": {
     "frozen_snapshot": "never modify /app/workflow/.export_report.original",

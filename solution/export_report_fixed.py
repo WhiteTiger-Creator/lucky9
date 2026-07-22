@@ -195,7 +195,7 @@ def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, lis
                     shared += max(0, min(le, me) - max(ls, ms))
             audit_used = max(audit_overlap - shared, 0)
             adjusted_runtime = max(
-                runtime - (-(-sandbox_overlap // 2)) - (audit_used // 3), 0
+                runtime - (-(-sandbox_overlap // 2)) - (-(-audit_used // 3)), 0
             )
             idle_gap = 0 if prev_end is None else max(session["start_ms"] - prev_end, 0)
             carry_in = max(prev_carry_out - (-(-idle_gap // 4)), 0)
