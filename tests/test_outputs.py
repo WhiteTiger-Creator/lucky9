@@ -339,9 +339,11 @@ def test_admission_floor_is_per_class(repaired):
 
 
 def test_burst_digest_consistent(repaired):
+    """Each queue row's burst digest is reproducible from that row's own contracted payload."""
     for row in _jsonl(repaired / "contained.jsonl"):
         payload = (f"{row['host']}|{row['start_ms']}|{row['end_ms']}"
-                   f"|{','.join(row['exec_ids'])}|{row['lead_class']}|{row['ledger_runtime_ms']}")
+                   f"|{','.join(row['exec_ids'])}|{row['lead_class']}|{row['ledger_runtime_ms']}"
+                   f"|{row['containment_index']}")
         assert row["burst_digest"] == hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
@@ -385,3 +387,42 @@ def test_custom_output_dir_is_honoured(tmp_path):
                    capture_output=True, text=True, check=True)
     assert (out / "summary.json").exists()
     assert (out / "repair_audit.json").exists()
+
+
+def test_probe_families_round_in_opposite_directions(repaired):
+    """PX-3342/PX-3344: the sandbox and audit probe halves round the opposite way.
+
+    Sandbox floors its all-scope half and ceilings its class half; audit does the reverse,
+    so an implementation applying one family's convention to both yields different pressure
+    scores. Both are asserted well-formed here and pinned exactly by the fixture comparison.
+    """
+    rows = _jsonl(repaired / "contained.jsonl")
+    assert rows, "queue is empty; probe scores cannot be exercised"
+    for row in rows:
+        assert isinstance(row["sandbox_pressure_score"], int)
+        assert isinstance(row["audit_pressure_score"], int)
+        assert row["sandbox_pressure_score"] >= 0
+        assert row["audit_pressure_score"] >= 0
+
+
+def test_containment_index_is_the_sum_of_both_probe_families(repaired):
+    """PX-3346: containment_index = sandbox + audit pressure + floored adjusted runtime.
+
+    The index is reproducible from fields already on the row, so an implementation that
+    combines them differently is detected without re-deriving the probes.
+    """
+    for row in _jsonl(repaired / "contained.jsonl"):
+        expected = (row["sandbox_pressure_score"] + row["audit_pressure_score"]
+                    + (row["adjusted_runtime_ms"] // 40))
+        assert row["containment_index"] == expected
+
+
+def test_containment_index_participates_in_priority(repaired):
+    """PX-3346: a session with containment_index >= 12 is at least urgent.
+
+    The index is a promotion path independent of ledger_runtime_ms and exec_count, so an
+    implementation that ignores it leaves such sessions at normal.
+    """
+    for row in _jsonl(repaired / "contained.jsonl"):
+        if row["containment_index"] >= 12:
+            assert row["priority"] in ("critical", "urgent"), row["incident_id"]

@@ -196,6 +196,9 @@
         "total_audit_overlap_ms",
         "max_ledger_runtime_ms",
         "max_carry_out_ms",
+        "max_containment_index",
+        "max_audit_pressure_score",
+        "max_sandbox_pressure_score",
         "longest_session_ms",
         "contained_count",
         "priority_counts",
@@ -236,6 +239,9 @@
         "audit_overlap_ms",
         "carry_in_ms",
         "carry_out_ms",
+        "containment_index",
+        "audit_pressure_score",
+        "sandbox_pressure_score",
         "exec_count",
         "exec_ids",
         "burst_digest"
@@ -247,7 +253,7 @@
     }
   },
   "digest_payloads": {
-    "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms')",
+    "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms|containment_index')",
     "canonical_exec_checksum": "sha256 over one line per canonical row in emitted order, 'exec_id|image_ref|run_class|host|started_ms|ended_ms|killed_as_1_or_0'. Emitted order is the canonical rows sorted by (host, started_ms, exec_id) ascending.",
     "exec_policy_checksum": "sha256 over one line per control window, 'layer|scope|host|start_ms|end_ms', ordered by layer, then scope, then host, then start_ms",
     "containment_checksum": "sha256 over one line per queue row in queue order, 'incident_id|priority|ledger_runtime_ms|burst_digest'",

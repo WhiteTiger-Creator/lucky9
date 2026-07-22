@@ -121,6 +121,29 @@ def _overlap(a_start: int, a_end: int, spans: list[tuple[int, int]]) -> list[tup
     return out
 
 
+SANDBOX_PROBE_LOOKBACK_MS = 180
+AUDIT_PROBE_LOOKBACK_MS = 240
+
+
+def scope_spans(rows: list[dict], host: str, layer: str, scope: str) -> list[tuple[int, int]]:
+    """Compacted spans recorded for one EXACT scope, with no `all` fallback.
+
+    The probe families read each scope on its own, unlike controls_for which
+    resolves a class to a single effective span set.
+    """
+    return _compact([
+        (_norm_ms(r["start_ms"]), _norm_ms(r["end_ms"])) for r in rows
+        if r.get("layer") == layer and _norm_host(r.get("host")) == host
+        and str(r.get("scope")) == scope and _norm_ms(r["end_ms"]) > _norm_ms(r["start_ms"])
+    ])
+
+
+def probe_overlap_ms(end_ms: int, spans: list[tuple[int, int]], lookback_ms: int) -> int:
+    """Control coverage inside the half-open probe range [end_ms - lookback, end_ms + 1)."""
+    lo, hi = end_ms - lookback_ms, end_ms + 1
+    return sum(max(0, min(hi, e) - max(lo, s)) for s, e in spans)
+
+
 def controls_for(rows: list[dict], host: str, layer: str, run_class: str) -> list[tuple[int, int]]:
     """PX-3326 scope: a class uses its OWN windows for this layer; only a class with
     no window of its own falls back to the `all` scope. Own entries do not also
@@ -197,6 +220,30 @@ def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, lis
             adjusted_runtime = max(
                 runtime - (-(-sandbox_overlap // 2)) - (-(-audit_used // 3)), 0
             )
+            sbx_all_probe = probe_overlap_ms(
+                session["end_ms"], scope_spans(controls, host, "sandbox", "all"),
+                SANDBOX_PROBE_LOOKBACK_MS)
+            sbx_class_probe = probe_overlap_ms(
+                session["end_ms"], scope_spans(controls, host, "sandbox", session["lead_class"]),
+                SANDBOX_PROBE_LOOKBACK_MS)
+            aud_all_probe = probe_overlap_ms(
+                session["end_ms"], scope_spans(controls, host, "audit", "all"),
+                AUDIT_PROBE_LOOKBACK_MS)
+            aud_class_probe = probe_overlap_ms(
+                session["end_ms"], scope_spans(controls, host, "audit", session["lead_class"]),
+                AUDIT_PROBE_LOOKBACK_MS)
+            # PX-3342 / PX-3344: the two probe families round in OPPOSITE directions.
+            # Sandbox floors its all half and ceilings its class half; audit does the
+            # reverse. Neither direction may be inferred from the other.
+            sandbox_pressure_score = (
+                (sbx_all_probe // 26) + (-(-sbx_class_probe // 18)) + len(lock_spans)
+            )
+            audit_pressure_score = (
+                (-(-aud_all_probe // 34)) + (aud_class_probe // 22) + len(maint_spans)
+            )
+            containment_index = (
+                sandbox_pressure_score + audit_pressure_score + (adjusted_runtime // 40)
+            )
             idle_gap = 0 if prev_end is None else max(session["start_ms"] - prev_end, 0)
             carry_in = max(prev_carry_out - (-(-idle_gap // 4)), 0)
             ledger_runtime = adjusted_runtime + (-(-carry_in // 5))
@@ -209,6 +256,9 @@ def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, lis
                 "sandbox_overlap_ms": sandbox_overlap,
                 "audit_overlap_ms": audit_overlap,
                 "adjusted_runtime_ms": adjusted_runtime,
+                "sandbox_pressure_score": sandbox_pressure_score,
+                "audit_pressure_score": audit_pressure_score,
+                "containment_index": containment_index,
                 "idle_gap_ms": idle_gap, "carry_in_ms": carry_in,
                 "carry_out_ms": carry_out, "ledger_runtime_ms": ledger_runtime,
                 "exec_count": len(session["exec_ids"]),
@@ -231,13 +281,13 @@ def build_queue(sessions: dict[str, list[dict]]) -> list[dict]:
                 row["lead_class"] == "system" and row["sandbox_overlap_ms"] > 0
             ):
                 priority = "critical"
-            elif row["ledger_runtime_ms"] >= 300 or row["exec_count"] >= 3:
+            elif row["ledger_runtime_ms"] >= 300 or row["containment_index"] >= 12 or row["exec_count"] >= 3:
                 priority = "urgent"
             else:
                 priority = "normal"
             payload = (
                 f"{host}|{row['start_ms']}|{row['end_ms']}|{','.join(row['exec_ids'])}"
-                f"|{row['lead_class']}|{row['ledger_runtime_ms']}"
+                f"|{row['lead_class']}|{row['ledger_runtime_ms']}|{row['containment_index']}"
             )
             queue.append({
                 "incident_id": f"{host}:{row['start_ms']}-{row['end_ms']}",
@@ -248,6 +298,9 @@ def build_queue(sessions: dict[str, list[dict]]) -> list[dict]:
                 "sandbox_overlap_ms": row["sandbox_overlap_ms"],
                 "audit_overlap_ms": row["audit_overlap_ms"],
                 "carry_in_ms": row["carry_in_ms"], "carry_out_ms": row["carry_out_ms"],
+                "sandbox_pressure_score": row["sandbox_pressure_score"],
+                "audit_pressure_score": row["audit_pressure_score"],
+                "containment_index": row["containment_index"],
                 "exec_count": row["exec_count"], "exec_ids": row["exec_ids"],
                 "burst_digest": hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12],
             })
@@ -319,6 +372,9 @@ def export_report(events: list[dict], output_dir: Path, controls: list[dict]) ->
         "total_audit_overlap_ms": sum(r["audit_overlap_ms"] for r in all_rows),
         "max_ledger_runtime_ms": max((r["ledger_runtime_ms"] for r in all_rows), default=0),
         "max_carry_out_ms": max((r["carry_out_ms"] for r in all_rows), default=0),
+        "max_sandbox_pressure_score": max((r["sandbox_pressure_score"] for r in all_rows), default=0),
+        "max_audit_pressure_score": max((r["audit_pressure_score"] for r in all_rows), default=0),
+        "max_containment_index": max((r["containment_index"] for r in all_rows), default=0),
         "longest_session_ms": max((r["runtime_ms"] for r in all_rows), default=0),
         "contained_count": len(queue),
         "priority_counts": {

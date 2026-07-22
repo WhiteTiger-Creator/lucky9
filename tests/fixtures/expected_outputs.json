@@ -29,6 +29,9 @@
       "total_audit_overlap_ms": 1586,
       "max_ledger_runtime_ms": 491,
       "max_carry_out_ms": 780,
+      "max_sandbox_pressure_score": 10,
+      "max_audit_pressure_score": 7,
+      "max_containment_index": 15,
       "longest_session_ms": 611,
       "contained_count": 12,
       "priority_counts": {
@@ -38,7 +41,7 @@
       },
       "canonical_exec_checksum": "b680f88630d1939c100eaf63fcda4d3c2f43b635e858d7e3e56810e8eef684b8",
       "exec_policy_checksum": "4b4be2017862f452877db7cc8d36e40648a7561b573a97f69f14013dba240311",
-      "containment_checksum": "a510b03bda2a9b49f145f04295a8ab7494386d7cae42e5f6e2b2894769d121fc"
+      "containment_checksum": "82e0fef29d6accb0263359ad239f09ca0b177ba675d6a2ab5bb6e350e63c98ca"
     },
     "matrix": {
       "alpha": {
@@ -99,12 +102,15 @@
         "audit_overlap_ms": 180,
         "carry_in_ms": 0,
         "carry_out_ms": 503,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 1,
+        "containment_index": 14,
         "exec_count": 2,
         "exec_ids": [
           "px-008",
           "px-023"
         ],
-        "burst_digest": "32d4e691a003"
+        "burst_digest": "8a444b5de5f0"
       },
       {
         "incident_id": "echo:4210500161800-4210500162274",
@@ -120,12 +126,15 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 486,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 11,
         "exec_count": 2,
         "exec_ids": [
           "px-017",
           "px-025"
         ],
-        "burst_digest": "7bac4e2051f6"
+        "burst_digest": "65e26e4c18f9"
       },
       {
         "incident_id": "echo:4210500164199-4210500164521",
@@ -141,11 +150,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 742,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 3,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9019"
         ],
-        "burst_digest": "d198683fe821"
+        "burst_digest": "5b6d46625366"
       },
       {
         "incident_id": "alpha:4210500005546-4210500005868",
@@ -161,11 +173,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 742,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 10,
         "exec_count": 1,
         "exec_ids": [
           "x9003"
         ],
-        "burst_digest": "cdf378eb2df7"
+        "burst_digest": "dab93f09e1b9"
       },
       {
         "incident_id": "charlie:4210500084474-4210500084796",
@@ -181,11 +196,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 742,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 10,
         "exec_count": 1,
         "exec_ids": [
           "x9011"
         ],
-        "burst_digest": "20183ec03531"
+        "burst_digest": "0d7932e100fd"
       },
       {
         "incident_id": "alpha:4210500004200-4210500004518",
@@ -201,11 +219,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 512,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 7,
         "exec_count": 1,
         "exec_ids": [
           "px-028"
         ],
-        "burst_digest": "6a945fc5a291"
+        "burst_digest": "f1a64da474dc"
       },
       {
         "incident_id": "bravo:4210500043969-4210500044291",
@@ -221,11 +242,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 717,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 10,
         "exec_count": 1,
         "exec_ids": [
           "x9007"
         ],
-        "burst_digest": "f315197b6bdf"
+        "burst_digest": "0d6ccbc9fea6"
       },
       {
         "incident_id": "foxtrot:4210500202980-4210500203302",
@@ -241,11 +265,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 677,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 10,
         "exec_count": 1,
         "exec_ids": [
           "x9023"
         ],
-        "burst_digest": "1dfbc8c4572b"
+        "burst_digest": "4716f368926b"
       },
       {
         "incident_id": "delta:4210500122831-4210500123153",
@@ -261,11 +288,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 666,
         "carry_out_ms": 780,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 10,
         "exec_count": 1,
         "exec_ids": [
           "x9015"
         ],
-        "burst_digest": "6718bea1c0d2"
+        "burst_digest": "67b04558e0ee"
       },
       {
         "incident_id": "bravo:4210500043091-4210500043391",
@@ -281,11 +311,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 326,
         "carry_out_ms": 587,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 5,
+        "containment_index": 12,
         "exec_count": 1,
         "exec_ids": [
           "x9005"
         ],
-        "burst_digest": "832ccdf68bf7"
+        "burst_digest": "c517ce4220bc"
       },
       {
         "incident_id": "foxtrot:4210500202102-4210500202402",
@@ -301,11 +334,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 286,
         "carry_out_ms": 547,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 5,
+        "containment_index": 12,
         "exec_count": 1,
         "exec_ids": [
           "x9021"
         ],
-        "burst_digest": "2d114fd6052f"
+        "burst_digest": "a9422ec74807"
       },
       {
         "incident_id": "delta:4210500121953-4210500122253",
@@ -321,11 +357,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 275,
         "carry_out_ms": 536,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 5,
+        "containment_index": 12,
         "exec_count": 1,
         "exec_ids": [
           "x9013"
         ],
-        "burst_digest": "2fa815a08139"
+        "burst_digest": "3a175228ca50"
       }
     ]
   },
@@ -359,6 +398,9 @@
       "total_audit_overlap_ms": 429,
       "max_ledger_runtime_ms": 491,
       "max_carry_out_ms": 547,
+      "max_sandbox_pressure_score": 6,
+      "max_audit_pressure_score": 4,
+      "max_containment_index": 14,
       "longest_session_ms": 611,
       "contained_count": 9,
       "priority_counts": {
@@ -368,7 +410,7 @@
       },
       "canonical_exec_checksum": "c22589f6f16000b4c3109d7769a257a1a89d21f1569d263b47bbacb07685f7db",
       "exec_policy_checksum": "4b4be2017862f452877db7cc8d36e40648a7561b573a97f69f14013dba240311",
-      "containment_checksum": "7d09745ddb698e32ad338e47fb72486e2f5bb35e630bed0b05c0ee777a70fe8a"
+      "containment_checksum": "3d3505909710d40410dbc3c8a871d43a22dad7a1cc69bb7588963abad82c0a07"
     },
     "matrix": {
       "alpha": {
@@ -429,12 +471,15 @@
         "audit_overlap_ms": 180,
         "carry_in_ms": 0,
         "carry_out_ms": 503,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 1,
+        "containment_index": 14,
         "exec_count": 2,
         "exec_ids": [
           "ax-008",
           "ax-023"
         ],
-        "burst_digest": "6704e5abf463"
+        "burst_digest": "6ad79cd2a87e"
       },
       {
         "incident_id": "echo:4210500161800-4210500162274",
@@ -450,12 +495,15 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 486,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 11,
         "exec_count": 2,
         "exec_ids": [
           "ax-017",
           "ax-025"
         ],
-        "burst_digest": "3fa177345321"
+        "burst_digest": "54c079d5024b"
       },
       {
         "incident_id": "alpha:4210500000000-4210500000492",
@@ -471,12 +519,15 @@
         "audit_overlap_ms": 180,
         "carry_in_ms": 0,
         "carry_out_ms": 392,
+        "sandbox_pressure_score": 1,
+        "audit_pressure_score": 3,
+        "containment_index": 13,
         "exec_count": 2,
         "exec_ids": [
           "ax-001",
           "ax-022"
         ],
-        "burst_digest": "d2b0bf362fb1"
+        "burst_digest": "4ea4d03aa766"
       },
       {
         "incident_id": "bravo:4210500042600-4210500042941",
@@ -492,11 +543,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 347,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 8,
         "exec_count": 1,
         "exec_ids": [
           "ax-029"
         ],
-        "burst_digest": "925873a58fee"
+        "burst_digest": "cef6f1f1b4b1"
       },
       {
         "incident_id": "alpha:4210500004200-4210500004518",
@@ -512,11 +566,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 93,
         "carry_out_ms": 417,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 7,
         "exec_count": 1,
         "exec_ids": [
           "ax-028"
         ],
-        "burst_digest": "dc232311a87e"
+        "burst_digest": "e75d4841aa04"
       },
       {
         "incident_id": "charlie:4210500082100-4210500082409",
@@ -532,11 +589,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 130,
         "carry_out_ms": 445,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 7,
         "exec_count": 1,
         "exec_ids": [
           "ax-010"
         ],
-        "burst_digest": "fe315496225d"
+        "burst_digest": "397e684b1864"
       },
       {
         "incident_id": "delta:4210500120700-4210500120959",
@@ -552,11 +612,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 265,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 6,
         "exec_count": 1,
         "exec_ids": [
           "ax-013"
         ],
-        "burst_digest": "e283f641a549"
+        "burst_digest": "f735c202e8a7"
       },
       {
         "incident_id": "bravo:4210500041700-4210500041868",
@@ -572,11 +635,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 174,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 4,
         "exec_count": 1,
         "exec_ids": [
           "ax-007"
         ],
-        "burst_digest": "93947c1b4626"
+        "burst_digest": "154cce8db0a4"
       },
       {
         "incident_id": "echo:4210500160850-4210500161008",
@@ -592,11 +658,14 @@
         "audit_overlap_ms": 0,
         "carry_in_ms": 0,
         "carry_out_ms": 164,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 3,
         "exec_count": 1,
         "exec_ids": [
           "ax-016"
         ],
-        "burst_digest": "9b05bf477ed5"
+        "burst_digest": "0928163f7faa"
       }
     ]
   },
