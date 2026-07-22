@@ -114,7 +114,19 @@
       "unique_exec_ids": "integer",
       "duplicate_exec_ids": "integer count of EXCESS duplicate rows = (raw row count) - (distinct id count); NOT a list of ids, and NOT the number of rows that carry a duplicated id",
       "killed_row_count": "integer"
-    }
+    },
+    "input_stats_keys_annotated": [
+      "raw_exec_count: integer",
+      "unique_exec_ids: integer",
+      "duplicate_exec_ids: integer - EXCESS duplicate rows = (raw rows) - (distinct exec_ids). NOT a list.",
+      "killed_row_count: integer"
+    ],
+    "defect_keys_annotated": [
+      "defect_id: string",
+      "dossier_quote: string - ONE verbatim line from the dossier, whitespace-stripped. Not a list, not a dict.",
+      "pipeline_evidence: string - ONE verbatim stripped line from the FROZEN snapshot. Not a list, not a dict.",
+      "repair_action: string"
+    ]
   },
   "repair_audit": {
     "output_name": "repair_audit.json",
@@ -140,7 +152,17 @@
       "defects_repaired": "JSON array of the defect id strings that were repaired, sorted ascending",
       "forbidden_tokens_removed": "JSON array of the forbidden token strings removed from the restored workflow, sorted",
       "artifacts": "JSON array of output basenames, sorted, including repair_audit.json"
-    }
+    },
+    "required_keys_annotated": [
+      "schema_version: string",
+      "pre_repair_sha256: string (64-char lowercase hex)",
+      "pre_repair_byte_count: integer",
+      "post_repair_sha256: string (64-char lowercase hex)",
+      "post_repair_byte_count: integer",
+      "defects_repaired: string[] - the defect id strings that were repaired, sorted ascending. NOT a count, NOT an integer.",
+      "forbidden_tokens_removed: string[] - the forbidden tokens that were removed, sorted. NOT a count.",
+      "artifacts: string[] - artifact file names written, sorted"
+    ]
   },
   "workflow_repair": {
     "path": "/app/workflow/export_report.py",
