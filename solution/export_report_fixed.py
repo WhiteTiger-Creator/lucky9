@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Badge-access containment rollup, restored per the Warden review decisions."""
+"""Process-execution containment rollup, restored per the Warden review decisions."""
 
 from __future__ import annotations
 

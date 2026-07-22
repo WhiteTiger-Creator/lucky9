@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Badge-access containment rollup deployed during the Warden incident.
+"""Process-execution containment rollup deployed during the Warden incident.
 
 This build is producing an unreliable containment queue. It is the artifact the
 response team asked to have investigated and restored.

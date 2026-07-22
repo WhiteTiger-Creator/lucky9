@@ -274,8 +274,8 @@ def test_duplicate_execs_are_collapsed_before_aggregates(repaired):
     assert summary["canonical_exec_count"] == summary["unique_exec_ids"]
 
 
-def test_unknown_run_class_falls_back_to_visitor(repaired):
-    """PX-3316: an unrecognized class becomes visitor, the LOWEST class."""
+def test_unknown_run_class_falls_back_to_adhoc(repaired):
+    """PX-3316: an unrecognized run class normalizes to adhoc, the LOWEST class."""
     rows = json.loads(EVENTS.read_text())
     unknown = [r for r in rows
                if str(r.get("run_class", "")).strip().lower() not in CLASS_RANK]
