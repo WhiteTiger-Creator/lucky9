@@ -1,74 +1,51 @@
-# Warden containment rollup — implementation guide
+# Vaultwatch signal recovery contract
 
-This guide describes the two commands, the artifacts they must leave behind, and the
-evidence rules. It does **not** decide any computed value. Every rule that produces a
-number or picks a winner lives in `/app/incident/exec_review_dossier.md`, and where the
-board revisited a point the latest dated decision is the one that binds.
-`/app/docs/report_spec.json` is the authoritative schema: exact key sets, digest payloads
-and checksum serialization. Read it in full — a missing key fails the artifact.
+This guide connects the incident-recovery request to the precise machine contract in `report_spec.json`. The JSON specification remains authoritative whenever this guide summarizes a rule.
 
-## Commands
+## Operator commands
 
-    python3 /app/exec_audit.py diagnose --dossier PATH --report PATH
-    python3 /app/exec_audit.py repair --output-dir PATH
+Create `/app/query_audit.py` with these commands:
 
-`diagnose` is **stateless**. It writes a complete report on every explicit call, whatever
-state the workflow is in and whether or not a repair has already run. It never depends on
-a previous invocation having happened.
+- `diagnose --dossier PATH --report PATH`
+- `repair --output-dir PATH`
 
-`repair` restores `/app/workflow/export_report.py`, runs it, and leaves five artifacts in
-the output directory: `summary.json`, `host_matrix.json`, `contained.jsonl`,
-`diagnosis.json` and `repair_audit.json`.
+An explicit `diagnose` call is stateless. It always writes a diagnosed report, regardless of the current workflow or existing repair artifacts. A repair reinstalls the corrected workflow, runs it in the requested directory, reruns it to prove idempotency, and leaves a repaired diagnosis at the output location.
 
-## Evidence rules
+Use `/app/incident/export_dossier.md` and the frozen bytes at `/app/workflow/.export_report.original` as audit evidence. Never modify the frozen file.
 
-Each of the six defects in `report_spec.json` under `known_defects` is reported with:
+## Diagnostic evidence
 
-* `dossier_quote` — a line from the dossier reproduced **verbatim**, character for
-  character, with only surrounding whitespace stripped. Not a paraphrase, not a summary,
-  not a re-wrapped line.
-* `pipeline_evidence` — likewise a verbatim stripped line, taken from the **frozen**
-  snapshot `/app/workflow/.export_report.original`, not from the live workflow.
-* `repair_action` — the action recorded for that defect in the spec.
+The diagnosis covers these six deployment defects:
 
-Defects are emitted sorted by `defect_id` ascending.
+- `wrong_source_field`
+- `risk_threshold_filter`
+- `recency_order`
+- `risk_class_normalization`
+- `dedupe_event`
+- `benign_filter`
 
-## Repair audit
+Each finding contains `id`, `severity`, `description`, `resolution`, and an `evidence` object containing `dossier_quote`, `pipeline_evidence`, and `repair_action`. **`dossier_quote` must be a literal substring of `/app/incident/export_dossier.md`, at least 30 characters long.** Runs of whitespace are treated as equivalent, so re-wrapping a long line across newlines still matches, but the wording is not. Every word, punctuation mark and piece of casing must come from the source. Summarising the entry, tidying its grammar, dropping a parenthetical, re-ordering a clause or splicing with an ellipsis does not satisfy the requirement. Reproduce the run of characters exactly rather than describing it. Pipeline evidence and repair actions are at least 10 characters. **`pipeline_evidence` must be a character-for-character verbatim substring of the frozen original workflow source at `/app/workflow/.export_report.original` — copy an exact run of source text (preserving whitespace, punctuation and case exactly as it appears in the file); a paraphrase, a reformatted line, or a whitespace-normalized version will not match.** **Every one of the three evidence strings must additionally contain a set of mandatory terms that differ per issue id. Those terms are enumerated in `/app/docs/report_spec.json` at the exact path `diagnosis_report.issues_found_item.evidence.required_terms_by_issue`, keyed by issue id and then by evidence field. Those terms are listed at that path, keyed by issue id and then by evidence field.** Matching is a plain case-sensitive substring test: the term must appear with exactly the capitalization, spacing and punctuation listed. Writing `Normalize severity` where the spec lists `normalize severity`, or `timestamp` where it lists `timestamp source`, does not satisfy the requirement even though the prose reads correctly. This applies to all three evidence fields, including terms assembled into a repair action.
 
-`repair_audit.json` carries every key of `repair_audit.required_keys` — a file with only the hash
-and token fields is incomplete: `schema_version` (the literal fixed by the spec),
-`pre_repair_sha256` / `pre_repair_byte_count` (read from the **frozen** snapshot, so identical
-whether or not a repair already ran), `post_repair_sha256` / `post_repair_byte_count` (the restored
-workflow on disk), `defects_repaired` (the sorted array of repaired defect id strings, not a count),
-`forbidden_tokens_removed` (sorted), and `artifacts` (the sorted array of file names written).
+A diagnosed report contains only `pipeline_status`, `issues_found`, and `input_stats`, with status `diagnosed`. `input_stats` carries exactly the keys `query_count`, `unique_query_ids`, and `datastores` — no aliases. It does not contain `verified_summary` or `output_paths`. A repaired report has status `repaired`, embeds the generated summary, and uses the semantic path keys `summary_json`, `escalated_jsonl`, and `datastore_matrix_json`.
 
-## Order of operations
+## Signal processing
 
-The repaired workflow must be written to disk **before** it is loaded or executed, so a
-single `repair` invocation produces artifacts from the restored code rather than from the
-build that was on disk when the command started. A repair that runs the old module and
-patches afterwards will disagree with a rerun.
+The workflow canonicalizes queries and deterministically deduplicates them by `query_id`. Muted or actively overridden candidates do not enter the triage queue. Override windows are normalized and compacted before overlap and pressure calculations.
 
-## Processing stages
+Related queries form transitive chains. Chains then participate in a directed reach graph whose strongest path is propagated in deterministic order. Chain reach affects final row ordering, signal digests, and summary checksums. `report_spec.json` defines the schemas, checksum serialization, and digest payloads; the normalization rules, tie-break cascade, interval boundaries, edge rules, and equations themselves were settled during the Vaultwatch review and are queryed as #DQ-ticketed decision notes in the incident dossier — reconcile them there, and note the February triage proposals were partly reversed later.
 
-The rollup proceeds in this order. What each stage *does* is governed by the dossier.
+## Repair audit and artifacts
 
-1. **Canonicalization** — normalize exec class, host, binary, timestamps and the killed
-   flag; drop rows with no exec id.
-2. **Deduplication** — collapse repeated `exec_id` rows. This happens before any count,
-   aggregate or checksum is computed.
-3. **Session construction** — group canonical rows by host and merge them into occupancy
-   sessions across the stitch gap.
-4. **Control-window attenuation** — resolve each layer's windows for the session's class,
-   measure the overlap, and reduce the runtime.
-5. **Occupancy ledger** — carry propagates between consecutive sessions in a host and
-   decays across the idle gap.
-6. **Containment admission, priority and ordering** — admit by the per-class floor, assign
-   a priority tier, order the queue, then apply the responder capacity cap.
-7. **Aggregation and checksums** — per-host matrix, summary totals, digests.
+Every repair reads the pre-repair SHA-256 from the frozen bytes before replacing the active workflow. `repair_audit.json` contains `patched_workflow`, `processing_steps`, `removed_tokens`, `pre_repair`, and `post_repair`. The **value** of `processing_steps` must be the array at `repair_audit.processing_steps` in `/app/docs/report_spec.json`, copied element for element in the same order. Composing your own step names, renaming a step, reordering them, or altering a step name does not satisfy the requirement — reproduce each string exactly as the spec writes it.
 
-## Generalization
+`removed_tokens` maps each forbidden token string to a boolean. The removed-token map uses the exact source literals `event["occurred_at"]` and `severity == "critical"`. The post-repair section queries integer `escalated_count` and `rerun_escalated_count`.
 
-The repaired rollup is graded on behaviour. It must accept an alternate exec stream via
-`--input`, produce identical output on reruns, and derive every value from the operational
-inputs and the governing decisions. Nothing is read or imported from external grading resources. No particular identifiers, helper names or code structure are required.
+The requested output directory contains exactly:
+
+- `summary.json`
+- `datastore_matrix.json`
+- `escalated.jsonl`
+- `diagnosis.json`
+- `repair_audit.json`
+
+Write `escalated.jsonl` as compact JSON Lines. All schemas, sort keys, field domains, checksums, and digest payloads are defined in `/app/docs/report_spec.json`.

@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Process-execution containment rollup deployed during the Warden incident.
-
-This build is producing an unreliable containment queue. It is the artifact the
-response team asked to have investigated and restored.
-"""
+"""Broken Vaultwatch signal workflow used for repair task."""
 
 from __future__ import annotations
 
@@ -11,8 +7,7 @@ import argparse
 import json
 from pathlib import Path
 
-SCHEMA_VERSION = "exec-containment-v2"
-CLASS_ORDER = ["system", "service", "batch", "adhoc"]
+SCHEMA_VERSION = "identity-triage-v2"
 
 
 def load_events(path: Path) -> list[dict]:
@@ -22,56 +17,57 @@ def load_events(path: Path) -> list[dict]:
 def export_report(events: list[dict], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    run_counts = {name: 0 for name in CLASS_ORDER}
-    hosts: set[str] = set()
+    severity_counts = {name: 0 for name in ("critical", "high", "medium", "low")}
+    datastores: set[str] = set()
     for event in events:
-        run_class = str(event.get("run_class", ""))
-        if run_class in run_counts:
-            run_counts[run_class] += 1
-        hosts.add(str(event.get("host", "")))
+        severity = str(event.get("severity", ""))
+        if severity in severity_counts:
+            severity_counts[severity] += 1
+        datastores.add(str(event.get("datastore", "")))
 
-    contained = []
+    signals = []
     for event in events:
-        if event.get("run_class") == "system":
-            contained.append(
+        severity = event.get("severity")
+        if severity == "critical":
+            signals.append(
                 {
-                    "exec_id": event["exec_id"],
-                    "entered_ms": event["granted_at"] if "granted_at" in event else 0,
-                    "run_class": event["run_class"],
-                    "host": event["host"],
-                    "binary": event["binary"],
+                    "query_id": event["query_id"],
+                    "occurred_ms": event["occurred_at"] if "occurred_at" in event else 0,
+                    "severity": event["severity"],
+                    "datastore": event["datastore"],
+                    "detector": event["detector"],
                 }
             )
 
-    contained.sort(key=lambda row: row["entered_ms"])
+    signals.sort(key=lambda row: row["occurred_ms"])
 
     summary = {
         "schema_version": SCHEMA_VERSION,
-        "raw_exec_count": len(events),
-        "unique_exec_ids": len({str(event["exec_id"]) for event in events}),
-        "total_execs": len(events),
-        "run_counts": run_counts,
-        "hosts": sorted(hosts),
-        "contained_count": len(contained),
-        "killed_excluded_count": 0,
+        "raw_query_count": len(events),
+        "unique_query_ids": len({str(event["query_id"]) for event in events}),
+        "total_queries": len(events),
+        "severity_counts": severity_counts,
+        "datastores": sorted(datastores),
+        "escalated_count": len(signals),
+        "dismissed_excluded_count": 0,
     }
 
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
-    (output_dir / "host_matrix.json").write_text(json.dumps({}, indent=2) + "\n")
-    with (output_dir / "contained.jsonl").open("w", encoding="utf-8") as handle:
-        for row in contained:
+    (output_dir / "datastore_matrix.json").write_text(json.dumps({}, indent=2) + "\n")
+    with (output_dir / "escalated.jsonl").open("w", encoding="utf-8") as handle:
+        for row in signals:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="/app/data/exec_events.json")
+    parser.add_argument("--input", default="/app/data/events.json")
     parser.add_argument("--output-dir", default="/app/output")
     args = parser.parse_args()
 
     events = load_events(Path(args.input))
     export_report(events, Path(args.output_dir))
-    print(f"Wrote containment rollup to {args.output_dir}")
+    print(f"Wrote report to {args.output_dir}")
 
 
 if __name__ == "__main__":
