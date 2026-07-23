@@ -343,7 +343,7 @@ def test_burst_digest_consistent(repaired):
     for row in _jsonl(repaired / "contained.jsonl"):
         payload = (f"{row['host']}|{row['start_ms']}|{row['end_ms']}"
                    f"|{','.join(row['exec_ids'])}|{row['lead_class']}|{row['ledger_runtime_ms']}"
-                   f"|{row['containment_index']}")
+                   f"|{row['containment_index']}|{row['lateral_exposure_score']}")
         assert row["burst_digest"] == hashlib.sha256(payload.encode()).hexdigest()[:12]
 
 
@@ -426,3 +426,136 @@ def test_containment_index_participates_in_priority(repaired):
     for row in _jsonl(repaired / "contained.jsonl"):
         if row["containment_index"] >= 12:
             assert row["priority"] in ("critical", "urgent"), row["incident_id"]
+
+
+# ------------------------------------------------- lateral exposure ---------
+
+DEPS = Path("/app/data/host_dependency_edges.json")
+
+# PX-3348 packing values for the shipped dependency graph, keyed by hop bound.
+EXPECTED_PACKING = {
+    3: {"alpha": 23, "bravo": 20, "charlie": 20, "delta": 16, "echo": 13, "foxtrot": 14},
+    2: {"alpha": 16, "bravo": 15, "charlie": 15, "delta": 12, "echo": 9, "foxtrot": 9},
+}
+# What the same graph yields if each target's strongest path is summed instead.
+PER_TARGET_SUM = {"alpha": 39, "bravo": 37, "charlie": 39, "delta": 50,
+                  "echo": 38, "foxtrot": 48}
+HOP_BOUND = {"system": 3, "service": 3, "batch": 2, "adhoc": 2}
+
+
+def _edges() -> dict:
+    raw = json.loads(DEPS.read_text())
+    return {s.strip().lower(): {t.strip().lower(): int(w) for t, w in v.items()}
+            for s, v in raw.items()}
+
+
+def _paths(origin: str, edges: dict, bound: int):
+    found = []
+
+    def walk(node, weight, visited, trail, depth):
+        for target, ew in edges.get(node, {}).items():
+            if target == origin or target in visited:
+                continue
+            reached = visited | {target}
+            found.append((weight + ew, reached, trail + (target,)))
+            if depth + 1 < bound:
+                walk(target, weight + ew, reached, trail + (target,), depth + 1)
+
+    walk(origin, 0, frozenset(), (origin,), 0)
+    return found
+
+
+def _target_best(origin: str, edges: dict, bound: int) -> dict:
+    best: dict = {}
+    for weight, _n, trail in _paths(origin, edges, bound):
+        rendered = ">".join(trail)
+        cur = best.get(trail[-1])
+        if cur is None or weight > cur[0] or (weight == cur[0] and rendered < cur[1]):
+            best[trail[-1]] = (weight, rendered)
+    return best
+
+
+def test_lateral_exposure_is_the_node_disjoint_packing(repaired):
+    """PX-3348: the score is a max-weight node-disjoint path packing.
+
+    The per-target sum is the natural wrong answer and is strictly larger on every
+    host in the shipped graph, so summing is separated from packing by the value alone.
+    """
+    rows = _jsonl(repaired / "contained.jsonl")
+    assert rows, "queue is empty; lateral exposure cannot be exercised"
+    for row in rows:
+        bound = HOP_BOUND[row["lead_class"]]
+        assert row["lateral_exposure_score"] == EXPECTED_PACKING[bound][row["host"]], row["incident_id"]
+        assert row["lateral_exposure_score"] != PER_TARGET_SUM[row["host"]], (
+            f"{row['incident_id']} summed each target's strongest path instead of packing")
+
+
+def test_lateral_hop_bound_follows_the_lead_class(repaired):
+    """PX-3348: system/service traverse three hops, batch/adhoc only two."""
+    for row in _jsonl(repaired / "contained.jsonl"):
+        deep = EXPECTED_PACKING[3][row["host"]]
+        shallow = EXPECTED_PACKING[2][row["host"]]
+        expected = deep if row["lead_class"] in ("system", "service") else shallow
+        assert row["lateral_exposure_score"] == expected, row["incident_id"]
+
+
+def test_lateral_reachable_hosts_shape(repaired):
+    """PX-3350: a sorted array of reachable hosts that never contains the origin."""
+    edges = _edges()
+    for row in _jsonl(repaired / "contained.jsonl"):
+        hosts = row["lateral_reachable_hosts"]
+        assert isinstance(hosts, list) and all(isinstance(h, str) for h in hosts)
+        assert hosts == sorted(hosts), row["incident_id"]
+        assert row["host"] not in hosts, row["incident_id"]
+        expected = sorted(_target_best(row["host"], edges, HOP_BOUND[row["lead_class"]]))
+        assert hosts == expected, row["incident_id"]
+
+
+def test_lateral_path_digest_matches_the_contract_payload(repaired):
+    """PX-3350: digest over per-target strongest paths, with the packing as the score.
+
+    Both quantities must be right at once: the payload carries the per-target maxima
+    while the score it embeds is the packing, so conflating them breaks the digest.
+    """
+    edges = _edges()
+    for row in _jsonl(repaired / "contained.jsonl"):
+        best = _target_best(row["host"], edges, HOP_BOUND[row["lead_class"]])
+        payload = f"{row['host']}|{row['lateral_exposure_score']}|" + ";".join(
+            f"{t}:{best[t][0]}:{best[t][1]}" for t in sorted(best))
+        expected = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+        assert row["lateral_path_digest"] == expected, row["incident_id"]
+
+
+def test_burst_digest_carries_the_lateral_exposure_score(repaired):
+    """PX-3350: lateral_exposure_score is appended after containment_index."""
+    for row in _jsonl(repaired / "contained.jsonl"):
+        payload = (f"{row['host']}|{row['start_ms']}|{row['end_ms']}"
+                   f"|{','.join(row['exec_ids'])}|{row['lead_class']}"
+                   f"|{row['ledger_runtime_ms']}|{row['containment_index']}"
+                   f"|{row['lateral_exposure_score']}")
+        assert row["burst_digest"] == hashlib.sha256(
+            payload.encode("utf-8")).hexdigest()[:12], row["incident_id"]
+
+
+def test_lateral_exposure_promotes_priority(tmp_path):
+    """PX-3350: lateral_exposure_score >= 16 reaches urgent on its own.
+
+    Exercised on the alternate stream, where a session clears the bar on reach alone
+    while its runtime, index and exec count all sit below the other urgent triggers.
+    """
+    out = _repair(tmp_path, ALT_EVENTS)
+    rows = _jsonl(out / "contained.jsonl")
+    promoted = [r for r in rows if r["lateral_exposure_score"] >= 16
+                and r["ledger_runtime_ms"] < 300 and r["containment_index"] < 12
+                and r["exec_count"] < 3]
+    assert promoted, "no session is promoted by lateral reach alone"
+    for row in promoted:
+        assert row["priority"] in ("critical", "urgent"), row["incident_id"]
+
+
+def test_host_matrix_reports_max_lateral_exposure(repaired):
+    """PX-3350: each host carries its highest session exposure into the matrix."""
+    matrix = json.loads((repaired / "host_matrix.json").read_text())
+    for host, entry in matrix.items():
+        assert "max_lateral_exposure_score" in entry, host
+        assert entry["max_lateral_exposure_score"] <= EXPECTED_PACKING[3][host]

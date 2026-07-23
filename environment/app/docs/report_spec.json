@@ -204,7 +204,8 @@
         "priority_counts",
         "canonical_exec_checksum",
         "exec_policy_checksum",
-        "containment_checksum"
+        "containment_checksum",
+        "max_lateral_exposure_score"
       ],
       "run_counts": "always enumerates system, service, batch, adhoc in that order, emitting 0 for a class with no canonical rows; counts EVERY canonical row including killed ones",
       "priority_counts": "always enumerates critical, urgent, normal in that order, emitting 0 for an empty tier",
@@ -219,7 +220,8 @@
         "total_runtime_ms",
         "total_ledger_runtime_ms",
         "max_carry_out_ms",
-        "queued_count"
+        "queued_count",
+        "max_lateral_exposure_score"
       ]
     },
     "contained_jsonl": {
@@ -244,16 +246,20 @@
         "sandbox_pressure_score",
         "exec_count",
         "exec_ids",
-        "burst_digest"
+        "burst_digest",
+        "lateral_exposure_score",
+        "lateral_reachable_hosts",
+        "lateral_path_digest"
       ],
       "incident_id_format": "{host}:{start_ms}-{end_ms}",
       "exec_ids": "JSON array of exec-id strings sorted ascending",
       "lead_class": "exactly one of the lowercase strings system, service, batch, adhoc",
-      "priority": "exactly one of the lowercase strings critical, urgent, normal"
+      "priority": "exactly one of the lowercase strings critical, urgent, normal",
+      "lateral_reachable_hosts": "JSON array of host-name strings sorted ascending; never an object"
     }
   },
   "digest_payloads": {
-    "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms|containment_index')",
+    "burst_digest": "first 12 lowercase hex chars of sha256('host|start_ms|end_ms|comma_joined_sorted_exec_ids|lead_class|ledger_runtime_ms|containment_index|lateral_exposure_score')",
     "canonical_exec_checksum": "sha256 over one line per canonical row in emitted order, 'exec_id|image_ref|run_class|host|started_ms|ended_ms|killed_as_1_or_0'. Emitted order is the canonical rows sorted by (host, started_ms, exec_id) ascending.",
     "exec_policy_checksum": "sha256 over one line per control window, 'layer|scope|host|start_ms|end_ms', ordered by layer, then scope, then host, then start_ms",
     "containment_checksum": "sha256 over one line per queue row in queue order, 'incident_id|priority|ledger_runtime_ms|burst_digest'",
@@ -263,13 +269,15 @@
       "row_delimiter": "one LF character (\\n) BETWEEN rows",
       "trailing_delimiter": "none: do NOT append a newline or pipe after the final row. The payload is exactly '\\n'.join(rows) - it does not end in a newline.",
       "empty_input": "when there are no rows the payload is the empty string, and the digest is sha256 of the empty string"
-    }
+    },
+    "lateral_path_digest": "first 12 lowercase hex chars of sha256('origin|lateral_exposure_score|' + ';'-joined 'target:weight:path' triples, one per reachable host in ascending target order). weight is that target's strongest bounded simple path; path is its hosts joined by '>' with the origin included. The exposure score itself is the node-disjoint packing ruled on in the dossier, not the sum of these per-target weights."
   },
   "guardrails": {
     "frozen_snapshot": "never modify /app/workflow/.export_report.original",
     "verifier_trees": "never read or import external grading resources"
   },
   "inputs": {
-    "control_policies_path": "The sandbox/audit control windows are ALWAYS read from the fixed absolute path /app/data/exec_policies.json. --input reparameterizes only the execution-telemetry stream; the policies path is never derived from the input path and never becomes relative to the input or output directory."
+    "control_policies_path": "The sandbox/audit control windows are ALWAYS read from the fixed absolute path /app/data/exec_policies.json. --input reparameterizes only the execution-telemetry stream; the policies path is never derived from the input path and never becomes relative to the input or output directory.",
+    "dependency_graph_path": "The host service-dependency graph is ALWAYS read from the fixed absolute path /app/data/host_dependency_edges.json. Like the control policies it is never derived from --input or --output-dir. It is a JSON object mapping each source host to an object of downstream host -> integer edge weight. Hosts absent as a key have no outgoing dependency."
   }
 }

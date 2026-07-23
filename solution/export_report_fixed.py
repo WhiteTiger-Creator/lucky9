@@ -14,6 +14,9 @@ CLASS_RANK = {name: len(CLASS_ORDER) - idx for idx, name in enumerate(CLASS_ORDE
 PRIORITY_ORDER = ["critical", "urgent", "normal"]
 PRIORITY_RANK = {name: len(PRIORITY_ORDER) - idx for idx, name in enumerate(PRIORITY_ORDER)}
 CONTROLS_PATH = Path("/app/data/exec_policies.json")
+DEPENDENCY_PATH = Path("/app/data/host_dependency_edges.json")
+# PX-3348: deeper traversal is granted to the higher-trust lead classes only.
+LATERAL_HOP_BOUND = {"system": 3, "service": 3, "batch": 2, "adhoc": 2}
 STITCH_GAP_MS = 140
 CARRY_CAP_MS = 780
 ZONE_QUEUE_CAP = 2
@@ -162,7 +165,107 @@ def controls_for(rows: list[dict], host: str, layer: str, run_class: str) -> lis
     ])
 
 
-def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, list[dict]]:
+def load_dependencies(path: Path = DEPENDENCY_PATH) -> dict[str, dict[str, int]]:
+    """Read the host service-dependency graph from its fixed absolute path."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        _norm_host(source): {
+            _norm_host(target): int(weight) for target, weight in targets.items()
+        }
+        for source, targets in raw.items()
+    }
+
+
+def _lateral_paths(
+    origin: str, edges: dict[str, dict[str, int]], hop_bound: int
+) -> list[tuple[int, frozenset[str], tuple[str, ...]]]:
+    """Every simple directed path of 1..hop_bound edges leaving `origin`.
+
+    A path's weight is the sum of its edge weights and its node set is the hosts
+    it reaches, excluding the origin itself. The origin is never revisited.
+    """
+    found: list[tuple[int, frozenset[str], tuple[str, ...]]] = []
+
+    def walk(node: str, weight: int, visited: frozenset[str],
+             trail: tuple[str, ...], depth: int) -> None:
+        for target, edge_weight in edges.get(node, {}).items():
+            if target == origin or target in visited:
+                continue
+            reached = visited | {target}
+            found.append((weight + edge_weight, reached, trail + (target,)))
+            if depth + 1 < hop_bound:
+                walk(target, weight + edge_weight, reached, trail + (target,), depth + 1)
+
+    walk(origin, 0, frozenset(), (origin,), 0)
+    return found
+
+
+def max_disjoint_lateral_packing(
+    origin: str, edges: dict[str, dict[str, int]], hop_bound: int
+) -> int:
+    """Maximum total weight of node-disjoint bounded simple paths out of `origin`.
+
+    PX-3348: this is a packing, NOT the sum of each target's strongest path. Two
+    paths that share any non-origin host cannot both be counted, so a host reached
+    through an already-spent intermediate contributes nothing further.
+    """
+    paths = _lateral_paths(origin, edges, hop_bound)
+    best_total = 0
+
+    def pack(index: int, used: frozenset[str], total: int) -> None:
+        nonlocal best_total
+        if total > best_total:
+            best_total = total
+        if index >= len(paths):
+            return
+        pack(index + 1, used, total)
+        weight, nodes, _trail = paths[index]
+        if not (nodes & used):
+            pack(index + 1, used | nodes, total + weight)
+
+    pack(0, frozenset(), 0)
+    return best_total
+
+
+def lateral_target_paths(
+    origin: str, edges: dict[str, dict[str, int]], hop_bound: int
+) -> dict[str, tuple[int, str]]:
+    """Strongest bounded simple path from `origin` to each reachable host.
+
+    PX-3348 ties: among equal-weight paths to the same host, the one whose
+    `>`-joined rendering sorts lowest wins. Used only for the path digest; the
+    exposure score itself is the node-disjoint packing.
+    """
+    best: dict[str, tuple[int, str]] = {}
+    for weight, _nodes, trail in _lateral_paths(origin, edges, hop_bound):
+        target = trail[-1]
+        rendered = ">".join(trail)
+        current = best.get(target)
+        if current is None or weight > current[0] or (
+            weight == current[0] and rendered < current[1]
+        ):
+            best[target] = (weight, rendered)
+    return best
+
+
+def lateral_exposure(
+    origin: str, edges: dict[str, dict[str, int]], lead_class: str
+) -> tuple[int, list[str], str]:
+    """Exposure score, reachable hosts and path digest for one session."""
+    hop_bound = LATERAL_HOP_BOUND[lead_class]
+    score = max_disjoint_lateral_packing(origin, edges, hop_bound)
+    targets = lateral_target_paths(origin, edges, hop_bound)
+    reachable = sorted(targets)
+    payload = f"{origin}|{score}|" + ";".join(
+        f"{target}:{targets[target][0]}:{targets[target][1]}" for target in reachable
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+    return score, reachable, digest
+
+
+def build_sessions(
+    canonical: list[dict], controls: list[dict], dependencies: dict[str, dict[str, int]]
+) -> dict[str, list[dict]]:
     by_host: dict[str, list[dict]] = {}
     for row in canonical:
         # PX-3322: killed execs are excluded from session construction only.
@@ -250,6 +353,8 @@ def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, lis
             carry_out = min(
                 carry_in + adjusted_runtime + len(session["exec_ids"]) * 6, CARRY_CAP_MS
             )
+            lateral_score, lateral_hosts, lateral_digest = lateral_exposure(
+                host, dependencies, session["lead_class"])
             built.append({
                 "start_ms": session["start_ms"], "end_ms": session["end_ms"],
                 "runtime_ms": runtime,
@@ -264,6 +369,9 @@ def build_sessions(canonical: list[dict], controls: list[dict]) -> dict[str, lis
                 "exec_count": len(session["exec_ids"]),
                 "exec_ids": sorted(session["exec_ids"]),
                 "lead_class": session["lead_class"],
+                "lateral_exposure_score": lateral_score,
+                "lateral_reachable_hosts": lateral_hosts,
+                "lateral_path_digest": lateral_digest,
             })
             prev_carry_out = carry_out
             prev_end = session["end_ms"]
@@ -281,13 +389,20 @@ def build_queue(sessions: dict[str, list[dict]]) -> list[dict]:
                 row["lead_class"] == "system" and row["sandbox_overlap_ms"] > 0
             ):
                 priority = "critical"
-            elif row["ledger_runtime_ms"] >= 300 or row["containment_index"] >= 12 or row["exec_count"] >= 3:
+            elif (
+                row["ledger_runtime_ms"] >= 300
+                or row["containment_index"] >= 12
+                or row["exec_count"] >= 3
+                # PX-3348: lateral reach alone can raise a session to urgent.
+                or row["lateral_exposure_score"] >= 16
+            ):
                 priority = "urgent"
             else:
                 priority = "normal"
             payload = (
                 f"{host}|{row['start_ms']}|{row['end_ms']}|{','.join(row['exec_ids'])}"
                 f"|{row['lead_class']}|{row['ledger_runtime_ms']}|{row['containment_index']}"
+                f"|{row['lateral_exposure_score']}"
             )
             queue.append({
                 "incident_id": f"{host}:{row['start_ms']}-{row['end_ms']}",
@@ -302,6 +417,9 @@ def build_queue(sessions: dict[str, list[dict]]) -> list[dict]:
                 "audit_pressure_score": row["audit_pressure_score"],
                 "containment_index": row["containment_index"],
                 "exec_count": row["exec_count"], "exec_ids": row["exec_ids"],
+                "lateral_exposure_score": row["lateral_exposure_score"],
+                "lateral_reachable_hosts": row["lateral_reachable_hosts"],
+                "lateral_path_digest": row["lateral_path_digest"],
                 "burst_digest": hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12],
             })
     queue.sort(key=lambda r: (
@@ -320,10 +438,17 @@ def build_queue(sessions: dict[str, list[dict]]) -> list[dict]:
     return capped
 
 
-def export_report(events: list[dict], output_dir: Path, controls: list[dict]) -> dict:
+def export_report(
+    events: list[dict],
+    output_dir: Path,
+    controls: list[dict],
+    dependencies: dict[str, dict[str, int]] | None = None,
+) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
+    if dependencies is None:
+        dependencies = load_dependencies()
     canonical = canonical_events(events)
-    sessions = build_sessions(canonical, controls)
+    sessions = build_sessions(canonical, controls, dependencies)
     queue = build_queue(sessions)
 
     run_counts = {name: 0 for name in CLASS_ORDER}
@@ -338,6 +463,8 @@ def export_report(events: list[dict], output_dir: Path, controls: list[dict]) ->
             "total_ledger_runtime_ms": sum(r["ledger_runtime_ms"] for r in rows),
             "max_carry_out_ms": max((r["carry_out_ms"] for r in rows), default=0),
             "queued_count": sum(1 for r in queue if r["host"] == host),
+            "max_lateral_exposure_score": max(
+                (r["lateral_exposure_score"] for r in rows), default=0),
         }
         for host, rows in sessions.items()
     }
@@ -375,6 +502,8 @@ def export_report(events: list[dict], output_dir: Path, controls: list[dict]) ->
         "max_sandbox_pressure_score": max((r["sandbox_pressure_score"] for r in all_rows), default=0),
         "max_audit_pressure_score": max((r["audit_pressure_score"] for r in all_rows), default=0),
         "max_containment_index": max((r["containment_index"] for r in all_rows), default=0),
+        "max_lateral_exposure_score": max(
+            (r["lateral_exposure_score"] for r in all_rows), default=0),
         "longest_session_ms": max((r["runtime_ms"] for r in all_rows), default=0),
         "contained_count": len(queue),
         "priority_counts": {
@@ -400,7 +529,7 @@ def main() -> None:
     args = parser.parse_args()
 
     events = load_events(Path(args.input))
-    export_report(events, Path(args.output_dir), load_controls())
+    export_report(events, Path(args.output_dir), load_controls(), load_dependencies())
     print(f"Wrote containment rollup to {args.output_dir}")
 
 

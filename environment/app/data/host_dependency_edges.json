@@ -1,0 +1,8 @@
+{
+  "alpha": {"bravo": 4, "charlie": 3},
+  "bravo": {"delta": 5, "echo": 3},
+  "charlie": {"delta": 6, "echo": 2},
+  "delta": {"foxtrot": 7},
+  "echo": {"foxtrot": 4},
+  "foxtrot": {"alpha": 5}
+}
