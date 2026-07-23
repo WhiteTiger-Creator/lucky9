@@ -413,7 +413,7 @@ def test_containment_index_is_the_sum_of_both_probe_families(repaired):
     """
     for row in _jsonl(repaired / "contained.jsonl"):
         expected = (row["sandbox_pressure_score"] + row["audit_pressure_score"]
-                    + (row["adjusted_runtime_ms"] // 40))
+                    + (-(-row["adjusted_runtime_ms"] // 40)))
         assert row["containment_index"] == expected
 
 
@@ -440,6 +440,8 @@ EXPECTED_PACKING = {
 # What the same graph yields if each target's strongest path is summed instead.
 PER_TARGET_SUM = {"alpha": 39, "bravo": 37, "charlie": 39, "delta": 50,
                   "echo": 38, "foxtrot": 48}
+# PX-3352 per-owner contention bonus, added to every session on the owner host.
+CONTENTION = {"alpha": 16, "bravo": 0, "charlie": 18, "delta": 31, "echo": 0, "foxtrot": 26}
 HOP_BOUND = {"system": 3, "service": 3, "batch": 2, "adhoc": 2}
 
 
@@ -475,6 +477,75 @@ def _target_best(origin: str, edges: dict, bound: int) -> dict:
     return best
 
 
+def _lateral_paths_test(origin, edges, bound):
+    out = []
+    def walk(node, w, visited, trail, depth):
+        for t, ew in edges.get(node, {}).items():
+            if t == origin or t in visited:
+                continue
+            r = visited | {t}
+            out.append((w + ew, r, trail + (t,)))
+            if depth + 1 < bound:
+                walk(t, w + ew, r, trail + (t,), depth + 1)
+    walk(origin, 0, frozenset(), (origin,), 0)
+    return out
+
+
+def _packing_test(origin, edges, bound):
+    paths = _lateral_paths_test(origin, edges, bound)
+    best = 0
+    def rec(i, used, tot):
+        nonlocal best
+        best = max(best, tot)
+        if i >= len(paths):
+            return
+        rec(i + 1, used, tot)
+        w, ns, _t = paths[i]
+        if not (ns & used):
+            rec(i + 1, used | ns, tot + w)
+    rec(0, frozenset(), 0)
+    return best
+
+
+def test_px_3352_contention_owner_is_by_per_target_score(repaired):
+    """PX-3352: a contended host is charged to the origin with the strongest path
+    TO THAT TARGET -- not to the origin with the highest overall packed score.
+    The two rules pick different owners; this checks the governing one bites and
+    the alternative genuinely differs, and fails if no host is contended.
+    """
+    edges = _edges()
+
+    def tscores(origin):
+        best = {}
+        for w, _n, trail in _lateral_paths_test(origin, edges, 3):
+            t = trail[-1]
+            if t not in best or w > best[t]:
+                best[t] = w
+        return best
+
+    def packing(origin):
+        return _packing_test(origin, edges, 3)
+
+    hosts = sorted({row["host"] for row in _jsonl(repaired / "contained.jsonl")})
+    scores = {h: tscores(h) for h in hosts}
+    reach = {h: set(scores[h]) for h in hosts}
+    overall = {h: packing(h) for h in hosts}
+    by_target, by_overall = {}, {}
+    for tgt in sorted({t for h in hosts for t in reach[h]}):
+        claim = [h for h in hosts if tgt in reach[h]]
+        if len(claim) < 2:
+            continue
+        owner = sorted(claim, key=lambda h: (-scores[h][tgt], h))[0]
+        by_target[owner] = by_target.get(owner, 0) + scores[owner][tgt]
+        alt = sorted(claim, key=lambda h: (-overall[h], h))[0]
+        by_overall[alt] = by_overall.get(alt, 0) + scores[alt][tgt]
+    assert by_target, "no contended host -- PX-3352 is dormant"
+    assert by_target != by_overall, "both owner rules agree -- test cannot discriminate"
+    for row in _jsonl(repaired / "contained.jsonl"):
+        base = EXPECTED_PACKING[HOP_BOUND[row["lead_class"]]][row["host"]]
+        assert row["lateral_exposure_score"] == base + by_target.get(row["host"], 0), row["incident_id"]
+
+
 def test_lateral_exposure_is_the_node_disjoint_packing(repaired):
     """PX-3348: the score is a max-weight node-disjoint path packing.
 
@@ -485,16 +556,16 @@ def test_lateral_exposure_is_the_node_disjoint_packing(repaired):
     assert rows, "queue is empty; lateral exposure cannot be exercised"
     for row in rows:
         bound = HOP_BOUND[row["lead_class"]]
-        assert row["lateral_exposure_score"] == EXPECTED_PACKING[bound][row["host"]], row["incident_id"]
-        assert row["lateral_exposure_score"] != PER_TARGET_SUM[row["host"]], (
-            f"{row['incident_id']} summed each target's strongest path instead of packing")
+        expected = EXPECTED_PACKING[bound][row["host"]] + CONTENTION[row["host"]]
+        assert row["lateral_exposure_score"] == expected, row["incident_id"]
 
 
 def test_lateral_hop_bound_follows_the_lead_class(repaired):
     """PX-3348: system/service traverse three hops, batch/adhoc only two."""
     for row in _jsonl(repaired / "contained.jsonl"):
-        deep = EXPECTED_PACKING[3][row["host"]]
-        shallow = EXPECTED_PACKING[2][row["host"]]
+        bonus = CONTENTION[row["host"]]
+        deep = EXPECTED_PACKING[3][row["host"]] + bonus
+        shallow = EXPECTED_PACKING[2][row["host"]] + bonus
         expected = deep if row["lead_class"] in ("system", "service") else shallow
         assert row["lateral_exposure_score"] == expected, row["incident_id"]
 
@@ -558,4 +629,4 @@ def test_host_matrix_reports_max_lateral_exposure(repaired):
     matrix = json.loads((repaired / "host_matrix.json").read_text())
     for host, entry in matrix.items():
         assert "max_lateral_exposure_score" in entry, host
-        assert entry["max_lateral_exposure_score"] <= EXPECTED_PACKING[3][host]
+        assert entry["max_lateral_exposure_score"] <= EXPECTED_PACKING[3][host] + CONTENTION[host]

@@ -31,8 +31,8 @@
       "max_carry_out_ms": 780,
       "max_sandbox_pressure_score": 10,
       "max_audit_pressure_score": 7,
-      "max_containment_index": 15,
-      "max_lateral_exposure_score": 23,
+      "max_containment_index": 16,
+      "max_lateral_exposure_score": 47,
       "longest_session_ms": 611,
       "contained_count": 12,
       "priority_counts": {
@@ -42,7 +42,7 @@
       },
       "canonical_exec_checksum": "b680f88630d1939c100eaf63fcda4d3c2f43b635e858d7e3e56810e8eef684b8",
       "exec_policy_checksum": "4b4be2017862f452877db7cc8d36e40648a7561b573a97f69f14013dba240311",
-      "containment_checksum": "f35b1f5977331ba0c689f497264b8dd849a8f1f1a57c6ad3fd8ff394495fa2bb"
+      "containment_checksum": "6d957317286213ad1c6aaee2b62d442e96c3898a90c873a19d2b74734d1aec71"
     },
     "matrix": {
       "alpha": {
@@ -51,7 +51,7 @@
         "total_ledger_runtime_ms": 3403,
         "max_carry_out_ms": 780,
         "queued_count": 2,
-        "max_lateral_exposure_score": 23
+        "max_lateral_exposure_score": 39
       },
       "bravo": {
         "session_count": 8,
@@ -67,7 +67,7 @@
         "total_ledger_runtime_ms": 3176,
         "max_carry_out_ms": 780,
         "queued_count": 2,
-        "max_lateral_exposure_score": 20
+        "max_lateral_exposure_score": 38
       },
       "delta": {
         "session_count": 7,
@@ -75,7 +75,7 @@
         "total_ledger_runtime_ms": 1980,
         "max_carry_out_ms": 780,
         "queued_count": 2,
-        "max_lateral_exposure_score": 16
+        "max_lateral_exposure_score": 47
       },
       "echo": {
         "session_count": 8,
@@ -91,7 +91,7 @@
         "total_ledger_runtime_ms": 2070,
         "max_carry_out_ms": 780,
         "queued_count": 2,
-        "max_lateral_exposure_score": 14
+        "max_lateral_exposure_score": 40
       }
     },
     "queue": [
@@ -111,20 +111,20 @@
         "carry_out_ms": 503,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 1,
-        "containment_index": 14,
+        "containment_index": 15,
         "exec_count": 2,
         "exec_ids": [
           "px-008",
           "px-023"
         ],
-        "lateral_exposure_score": 15,
+        "lateral_exposure_score": 33,
         "lateral_reachable_hosts": [
           "delta",
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "3f9ac0f9fcab",
-        "burst_digest": "add03850e8e8"
+        "lateral_path_digest": "acb63b93ba61",
+        "burst_digest": "05301f375cea"
       },
       {
         "incident_id": "echo:4210500161800-4210500162274",
@@ -142,7 +142,7 @@
         "carry_out_ms": 486,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 11,
+        "containment_index": 12,
         "exec_count": 2,
         "exec_ids": [
           "px-017",
@@ -156,7 +156,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "a6c53ad67acb",
-        "burst_digest": "87d88ed20cbb"
+        "burst_digest": "68ec0c487308"
       },
       {
         "incident_id": "echo:4210500164199-4210500164521",
@@ -174,7 +174,7 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 3,
-        "containment_index": 11,
+        "containment_index": 12,
         "exec_count": 1,
         "exec_ids": [
           "x9019"
@@ -187,7 +187,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "a6c53ad67acb",
-        "burst_digest": "619c5d65fc85"
+        "burst_digest": "1cab82bbaf76"
       },
       {
         "incident_id": "alpha:4210500005546-4210500005868",
@@ -205,12 +205,12 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 10,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9003"
         ],
-        "lateral_exposure_score": 23,
+        "lateral_exposure_score": 39,
         "lateral_reachable_hosts": [
           "bravo",
           "charlie",
@@ -218,8 +218,8 @@
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "e2f6f2702763",
-        "burst_digest": "3ff0831cf9a5"
+        "lateral_path_digest": "0024684dce82",
+        "burst_digest": "634cb69aaa7d"
       },
       {
         "incident_id": "charlie:4210500084474-4210500084796",
@@ -237,20 +237,20 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 10,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9011"
         ],
-        "lateral_exposure_score": 20,
+        "lateral_exposure_score": 38,
         "lateral_reachable_hosts": [
           "alpha",
           "delta",
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "27e5a7f59b41",
-        "burst_digest": "9f6a211147ec"
+        "lateral_path_digest": "4a51aa4bd913",
+        "burst_digest": "75528fa062e7"
       },
       {
         "incident_id": "alpha:4210500004200-4210500004518",
@@ -268,12 +268,12 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 7,
+        "containment_index": 8,
         "exec_count": 1,
         "exec_ids": [
           "px-028"
         ],
-        "lateral_exposure_score": 23,
+        "lateral_exposure_score": 39,
         "lateral_reachable_hosts": [
           "bravo",
           "charlie",
@@ -281,8 +281,8 @@
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "e2f6f2702763",
-        "burst_digest": "9124146db3e5"
+        "lateral_path_digest": "0024684dce82",
+        "burst_digest": "a278d0fface5"
       },
       {
         "incident_id": "bravo:4210500043969-4210500044291",
@@ -300,7 +300,7 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 10,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9007"
@@ -313,7 +313,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "0cd0bb552f9f",
-        "burst_digest": "e8746887952a"
+        "burst_digest": "50b4527810e5"
       },
       {
         "incident_id": "foxtrot:4210500202980-4210500203302",
@@ -331,12 +331,12 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 10,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9023"
         ],
-        "lateral_exposure_score": 14,
+        "lateral_exposure_score": 40,
         "lateral_reachable_hosts": [
           "alpha",
           "bravo",
@@ -344,8 +344,8 @@
           "delta",
           "echo"
         ],
-        "lateral_path_digest": "b7b19b31504b",
-        "burst_digest": "726f879f4d2a"
+        "lateral_path_digest": "e889e5fbcb52",
+        "burst_digest": "06d24fdc4d64"
       },
       {
         "incident_id": "delta:4210500122831-4210500123153",
@@ -363,20 +363,20 @@
         "carry_out_ms": 780,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 10,
+        "containment_index": 11,
         "exec_count": 1,
         "exec_ids": [
           "x9015"
         ],
-        "lateral_exposure_score": 16,
+        "lateral_exposure_score": 47,
         "lateral_reachable_hosts": [
           "alpha",
           "bravo",
           "charlie",
           "foxtrot"
         ],
-        "lateral_path_digest": "a2cecf1a55d2",
-        "burst_digest": "1d3645442a66"
+        "lateral_path_digest": "82c1ac7b865e",
+        "burst_digest": "7768f6c81bd3"
       },
       {
         "incident_id": "bravo:4210500043091-4210500043391",
@@ -394,7 +394,7 @@
         "carry_out_ms": 587,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 5,
-        "containment_index": 12,
+        "containment_index": 13,
         "exec_count": 1,
         "exec_ids": [
           "x9005"
@@ -407,7 +407,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "0cd0bb552f9f",
-        "burst_digest": "dccfab7fc7f1"
+        "burst_digest": "c3d8c9262573"
       },
       {
         "incident_id": "foxtrot:4210500202102-4210500202402",
@@ -425,12 +425,12 @@
         "carry_out_ms": 547,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 5,
-        "containment_index": 12,
+        "containment_index": 13,
         "exec_count": 1,
         "exec_ids": [
           "x9021"
         ],
-        "lateral_exposure_score": 14,
+        "lateral_exposure_score": 40,
         "lateral_reachable_hosts": [
           "alpha",
           "bravo",
@@ -438,8 +438,8 @@
           "delta",
           "echo"
         ],
-        "lateral_path_digest": "b7b19b31504b",
-        "burst_digest": "cfffd4511673"
+        "lateral_path_digest": "e889e5fbcb52",
+        "burst_digest": "4337b3e460d3"
       },
       {
         "incident_id": "delta:4210500121953-4210500122253",
@@ -457,20 +457,20 @@
         "carry_out_ms": 536,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 5,
-        "containment_index": 12,
+        "containment_index": 13,
         "exec_count": 1,
         "exec_ids": [
           "x9013"
         ],
-        "lateral_exposure_score": 16,
+        "lateral_exposure_score": 47,
         "lateral_reachable_hosts": [
           "alpha",
           "bravo",
           "charlie",
           "foxtrot"
         ],
-        "lateral_path_digest": "a2cecf1a55d2",
-        "burst_digest": "2903e721fe03"
+        "lateral_path_digest": "82c1ac7b865e",
+        "burst_digest": "d4f124bb357e"
       }
     ]
   },
@@ -506,18 +506,18 @@
       "max_carry_out_ms": 547,
       "max_sandbox_pressure_score": 6,
       "max_audit_pressure_score": 4,
-      "max_containment_index": 14,
-      "max_lateral_exposure_score": 23,
+      "max_containment_index": 15,
+      "max_lateral_exposure_score": 43,
       "longest_session_ms": 611,
       "contained_count": 9,
       "priority_counts": {
         "critical": 2,
-        "urgent": 5,
-        "normal": 2
+        "urgent": 6,
+        "normal": 1
       },
       "canonical_exec_checksum": "c22589f6f16000b4c3109d7769a257a1a89d21f1569d263b47bbacb07685f7db",
       "exec_policy_checksum": "4b4be2017862f452877db7cc8d36e40648a7561b573a97f69f14013dba240311",
-      "containment_checksum": "afcbf60f8c60fd8c949a509de7ce1078355fca47a6f85393e290189219487aac"
+      "containment_checksum": "18e3360ab6d6b233ffde1167f5a9683acfe29bc102551696b24e346eb1910db4"
     },
     "matrix": {
       "alpha": {
@@ -526,7 +526,7 @@
         "total_ledger_runtime_ms": 1286,
         "max_carry_out_ms": 547,
         "queued_count": 2,
-        "max_lateral_exposure_score": 23
+        "max_lateral_exposure_score": 39
       },
       "bravo": {
         "session_count": 3,
@@ -542,7 +542,7 @@
         "total_ledger_runtime_ms": 1122,
         "max_carry_out_ms": 503,
         "queued_count": 2,
-        "max_lateral_exposure_score": 15
+        "max_lateral_exposure_score": 33
       },
       "delta": {
         "session_count": 2,
@@ -550,7 +550,7 @@
         "total_ledger_runtime_ms": 483,
         "max_carry_out_ms": 313,
         "queued_count": 1,
-        "max_lateral_exposure_score": 12
+        "max_lateral_exposure_score": 43
       },
       "echo": {
         "session_count": 2,
@@ -566,7 +566,7 @@
         "total_ledger_runtime_ms": 287,
         "max_carry_out_ms": 194,
         "queued_count": 0,
-        "max_lateral_exposure_score": 14
+        "max_lateral_exposure_score": 40
       }
     },
     "queue": [
@@ -586,20 +586,20 @@
         "carry_out_ms": 503,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 1,
-        "containment_index": 14,
+        "containment_index": 15,
         "exec_count": 2,
         "exec_ids": [
           "ax-008",
           "ax-023"
         ],
-        "lateral_exposure_score": 15,
+        "lateral_exposure_score": 33,
         "lateral_reachable_hosts": [
           "delta",
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "3f9ac0f9fcab",
-        "burst_digest": "729903ea4bdc"
+        "lateral_path_digest": "acb63b93ba61",
+        "burst_digest": "6d9ccd4bbe0d"
       },
       {
         "incident_id": "echo:4210500161800-4210500162274",
@@ -617,7 +617,7 @@
         "carry_out_ms": 486,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 11,
+        "containment_index": 12,
         "exec_count": 2,
         "exec_ids": [
           "ax-017",
@@ -631,7 +631,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "a6c53ad67acb",
-        "burst_digest": "3718e20a59ed"
+        "burst_digest": "012d94198d44"
       },
       {
         "incident_id": "alpha:4210500000000-4210500000492",
@@ -649,21 +649,21 @@
         "carry_out_ms": 392,
         "sandbox_pressure_score": 1,
         "audit_pressure_score": 3,
-        "containment_index": 13,
+        "containment_index": 14,
         "exec_count": 2,
         "exec_ids": [
           "ax-001",
           "ax-022"
         ],
-        "lateral_exposure_score": 16,
+        "lateral_exposure_score": 32,
         "lateral_reachable_hosts": [
           "bravo",
           "charlie",
           "delta",
           "echo"
         ],
-        "lateral_path_digest": "983ca09542c3",
-        "burst_digest": "a4fe5ccad8d6"
+        "lateral_path_digest": "06ceae68dcd7",
+        "burst_digest": "60e3ba128ee0"
       },
       {
         "incident_id": "bravo:4210500042600-4210500042941",
@@ -681,7 +681,7 @@
         "carry_out_ms": 347,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 8,
+        "containment_index": 9,
         "exec_count": 1,
         "exec_ids": [
           "ax-029"
@@ -693,7 +693,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "be4565e69ac4",
-        "burst_digest": "5117281ca161"
+        "burst_digest": "ad33fdc14f70"
       },
       {
         "incident_id": "alpha:4210500004200-4210500004518",
@@ -711,12 +711,12 @@
         "carry_out_ms": 417,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 7,
+        "containment_index": 8,
         "exec_count": 1,
         "exec_ids": [
           "ax-028"
         ],
-        "lateral_exposure_score": 23,
+        "lateral_exposure_score": 39,
         "lateral_reachable_hosts": [
           "bravo",
           "charlie",
@@ -724,8 +724,8 @@
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "e2f6f2702763",
-        "burst_digest": "77f8f64ed5f8"
+        "lateral_path_digest": "0024684dce82",
+        "burst_digest": "5d3bc9476017"
       },
       {
         "incident_id": "charlie:4210500082100-4210500082409",
@@ -743,19 +743,48 @@
         "carry_out_ms": 445,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 7,
+        "containment_index": 8,
         "exec_count": 1,
         "exec_ids": [
           "ax-010"
         ],
-        "lateral_exposure_score": 15,
+        "lateral_exposure_score": 33,
         "lateral_reachable_hosts": [
           "delta",
           "echo",
           "foxtrot"
         ],
-        "lateral_path_digest": "3f9ac0f9fcab",
-        "burst_digest": "ebf6817af220"
+        "lateral_path_digest": "acb63b93ba61",
+        "burst_digest": "4f3bb120b82e"
+      },
+      {
+        "incident_id": "delta:4210500120700-4210500120959",
+        "host": "delta",
+        "start_ms": 4210500120700,
+        "end_ms": 4210500120959,
+        "lead_class": "batch",
+        "priority": "urgent",
+        "runtime_ms": 259,
+        "adjusted_runtime_ms": 259,
+        "ledger_runtime_ms": 259,
+        "sandbox_overlap_ms": 0,
+        "audit_overlap_ms": 0,
+        "carry_in_ms": 0,
+        "carry_out_ms": 265,
+        "sandbox_pressure_score": 0,
+        "audit_pressure_score": 0,
+        "containment_index": 7,
+        "exec_count": 1,
+        "exec_ids": [
+          "ax-013"
+        ],
+        "lateral_exposure_score": 43,
+        "lateral_reachable_hosts": [
+          "alpha",
+          "foxtrot"
+        ],
+        "lateral_path_digest": "725e18a0a2e8",
+        "burst_digest": "0ac7608d98a6"
       },
       {
         "incident_id": "bravo:4210500041700-4210500041868",
@@ -773,7 +802,7 @@
         "carry_out_ms": 174,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 4,
+        "containment_index": 5,
         "exec_count": 1,
         "exec_ids": [
           "ax-007"
@@ -786,36 +815,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "0cd0bb552f9f",
-        "burst_digest": "f6f37415ab11"
-      },
-      {
-        "incident_id": "delta:4210500120700-4210500120959",
-        "host": "delta",
-        "start_ms": 4210500120700,
-        "end_ms": 4210500120959,
-        "lead_class": "batch",
-        "priority": "normal",
-        "runtime_ms": 259,
-        "adjusted_runtime_ms": 259,
-        "ledger_runtime_ms": 259,
-        "sandbox_overlap_ms": 0,
-        "audit_overlap_ms": 0,
-        "carry_in_ms": 0,
-        "carry_out_ms": 265,
-        "sandbox_pressure_score": 0,
-        "audit_pressure_score": 0,
-        "containment_index": 6,
-        "exec_count": 1,
-        "exec_ids": [
-          "ax-013"
-        ],
-        "lateral_exposure_score": 12,
-        "lateral_reachable_hosts": [
-          "alpha",
-          "foxtrot"
-        ],
-        "lateral_path_digest": "ff39f636ae91",
-        "burst_digest": "3ca46b3044e1"
+        "burst_digest": "16008d996f13"
       },
       {
         "incident_id": "echo:4210500160850-4210500161008",
@@ -833,7 +833,7 @@
         "carry_out_ms": 164,
         "sandbox_pressure_score": 0,
         "audit_pressure_score": 0,
-        "containment_index": 3,
+        "containment_index": 4,
         "exec_count": 1,
         "exec_ids": [
           "ax-016"
@@ -846,7 +846,7 @@
           "foxtrot"
         ],
         "lateral_path_digest": "a6c53ad67acb",
-        "burst_digest": "14a6b61cccab"
+        "burst_digest": "81f1fe61a7f6"
       }
     ]
   },

@@ -248,12 +248,48 @@ def lateral_target_paths(
     return best
 
 
+CONTENTION_HOP_BOUND = 3
+
+
+def lateral_contention_bonus(
+    hosts: list[str], edges: dict[str, dict[str, int]]
+) -> dict[str, int]:
+    """PX-3352 per-owner contention bonus, keyed by origin host.
+
+    A target host reachable from MORE THAN ONE origin host is charged to exactly one
+    of them — the owner, whose strongest bounded simple path score TO THAT TARGET is
+    highest (ties by the lexicographically smallest origin host). That per-target
+    score (NOT the origin's overall packed exposure) is added to the owner. Reachability
+    here uses the full hop bound CONTENTION_HOP_BOUND, independent of any session's
+    lead_class, so ownership does not depend on which session is being scored.
+    """
+    target_scores = {
+        host: {t: s for t, (s, _p) in
+               lateral_target_paths(host, edges, CONTENTION_HOP_BOUND).items()}
+        for host in sorted(hosts)
+    }
+    claimants: dict[str, list[str]] = {}
+    for origin in sorted(hosts):
+        for target in target_scores[origin]:
+            claimants.setdefault(target, []).append(origin)
+    bonus: dict[str, int] = {}
+    for target, origins in claimants.items():
+        if len(origins) < 2:
+            continue
+        owner = min(origins, key=lambda o: (-target_scores[o][target], o))
+        bonus[owner] = bonus.get(owner, 0) + target_scores[owner][target]
+    return bonus
+
+
 def lateral_exposure(
-    origin: str, edges: dict[str, dict[str, int]], lead_class: str
+    origin: str, edges: dict[str, dict[str, int]], lead_class: str,
+    contention_bonus: int = 0,
 ) -> tuple[int, list[str], str]:
     """Exposure score, reachable hosts and path digest for one session."""
     hop_bound = LATERAL_HOP_BOUND[lead_class]
-    score = max_disjoint_lateral_packing(origin, edges, hop_bound)
+    # PX-3352: the contention bonus this host OWNS is folded in BEFORE the digest,
+    # so the digest commits to the attributed score.
+    score = max_disjoint_lateral_packing(origin, edges, hop_bound) + contention_bonus
     targets = lateral_target_paths(origin, edges, hop_bound)
     reachable = sorted(targets)
     payload = f"{origin}|{score}|" + ";".join(
@@ -272,6 +308,9 @@ def build_sessions(
         if row["killed"]:
             continue
         by_host.setdefault(row["host"], []).append(row)
+
+    # PX-3352: trust contention across the hosts that carry sessions, computed once.
+    contention_bonus = lateral_contention_bonus(list(by_host), dependencies)
 
     result: dict[str, list[dict]] = {}
     for host, rows in by_host.items():
@@ -345,7 +384,7 @@ def build_sessions(
                 (-(-aud_all_probe // 34)) + (aud_class_probe // 22) + len(maint_spans)
             )
             containment_index = (
-                sandbox_pressure_score + audit_pressure_score + (adjusted_runtime // 40)
+                sandbox_pressure_score + audit_pressure_score + (-(-adjusted_runtime // 40))
             )
             idle_gap = 0 if prev_end is None else max(session["start_ms"] - prev_end, 0)
             carry_in = max(prev_carry_out - (-(-idle_gap // 4)), 0)
@@ -354,7 +393,8 @@ def build_sessions(
                 carry_in + adjusted_runtime + len(session["exec_ids"]) * 6, CARRY_CAP_MS
             )
             lateral_score, lateral_hosts, lateral_digest = lateral_exposure(
-                host, dependencies, session["lead_class"])
+                host, dependencies, session["lead_class"],
+                contention_bonus.get(host, 0))
             built.append({
                 "start_ms": session["start_ms"], "end_ms": session["end_ms"],
                 "runtime_ms": runtime,
