@@ -1,0 +1,720 @@
+{
+  "primary": {
+    "summary": {
+      "schema_version": "identity-triage-v2",
+      "raw_query_count": 28,
+      "unique_query_ids": 26,
+      "total_queries": 26,
+      "severity_counts": {
+        "critical": 9,
+        "high": 14,
+        "medium": 2,
+        "low": 1
+      },
+      "datastores": [
+        "analytics-lake",
+        "audit-store",
+        "customers-db",
+        "hr-db",
+        "payments-db",
+        "sessions-cache"
+      ],
+      "escalated_count": 16,
+      "dismissed_excluded_count": 2,
+      "override_excluded_count": 5,
+      "override_compaction_checksum": "e9f5057124af47e84353138110df62bf1bda0211aba53761e57fd7786a9f3520",
+      "max_wide_pressure_score": 2,
+      "max_pressure_index": 4,
+      "max_override_pressure_score": 2,
+      "chain_count": 13,
+      "max_chain_risk_score": 17,
+      "chain_digest_checksum": "258d5913d232b01a880d4abf517ffbff7148685193a6dff75373fb3087506af4",
+      "max_chain_reach_score": 41,
+      "chain_reach_digest_checksum": "699fa9ab63e07a8ef177cc50b5a7ccbfe1c4cc48175607e8eacbcf264bc01646",
+      "signal_digest_checksum": "e03150d10ff959b2d2c7324b280d79cf50812d283246d41db5b1dc935a51bb9a",
+      "critical_escalation_ids": [
+        "dq-601",
+        "dq-603",
+        "dq-604",
+        "dq-605",
+        "dq-611",
+        "dq-620",
+        "dq-630",
+        "dq-631"
+      ],
+      "critical_escalation_count": 8,
+      "max_escalation_pressure": 26,
+      "escalation_ledger_checksum": "86022cb3834afa176defebaa2c1cd600d58a2d5504d0cac55ef9db1a7aa39202"
+    },
+    "datastore_matrix": {
+      "analytics-lake": {
+        "critical": 0,
+        "high": 2,
+        "medium": 0,
+        "low": 1
+      },
+      "audit-store": {
+        "critical": 2,
+        "high": 3,
+        "medium": 0,
+        "low": 0
+      },
+      "customers-db": {
+        "critical": 3,
+        "high": 5,
+        "medium": 0,
+        "low": 0
+      },
+      "hr-db": {
+        "critical": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+      },
+      "payments-db": {
+        "critical": 1,
+        "high": 3,
+        "medium": 1,
+        "low": 0
+      },
+      "sessions-cache": {
+        "critical": 2,
+        "high": 0,
+        "medium": 1,
+        "low": 0
+      }
+    },
+    "escalated": [
+      {
+        "query_id": "dq-681",
+        "occurred_ms": 9630000010290,
+        "severity": "high",
+        "datastore": "audit-store",
+        "detector": "signing key exposure",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "c2a897f074",
+        "chain_size": 2,
+        "chain_span_ms": 90,
+        "chain_risk_score": 9,
+        "chain_digest": "2545da1310c5",
+        "chain_reach_score": 9,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "c2a897f074"
+        ],
+        "chain_reach_digest": "17e85668e8d2",
+        "signal_digest": "4d600ca7ef80"
+      },
+      {
+        "query_id": "dq-680",
+        "occurred_ms": 9630000010200,
+        "severity": "high",
+        "datastore": "audit-store",
+        "detector": "credential in query text",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "c2a897f074",
+        "chain_size": 2,
+        "chain_span_ms": 90,
+        "chain_risk_score": 9,
+        "chain_digest": "2545da1310c5",
+        "chain_reach_score": 9,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "c2a897f074"
+        ],
+        "chain_reach_digest": "17e85668e8d2",
+        "signal_digest": "539421ae2183"
+      },
+      {
+        "query_id": "dq-674",
+        "occurred_ms": 9630000009400,
+        "severity": "critical",
+        "datastore": "sessions-cache",
+        "detector": "replication sync anomaly",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "019aabde05",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 6,
+        "chain_digest": "606c60266c7b",
+        "chain_reach_score": 6,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "019aabde05"
+        ],
+        "chain_reach_digest": "7736464db710",
+        "signal_digest": "5e35c265c50c"
+      },
+      {
+        "query_id": "dq-673",
+        "occurred_ms": 9630000009200,
+        "severity": "high",
+        "datastore": "payments-db",
+        "detector": "exfil via temp table",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 1,
+        "pressure_index": 1,
+        "chain_id": "fb12ad8154",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "d777dc7d0df8",
+        "chain_reach_score": 14,
+        "chain_reach_depth": 1,
+        "chain_reach_path": [
+          "935ee4bd7a",
+          "fb12ad8154"
+        ],
+        "chain_reach_digest": "3556b4f18a81",
+        "signal_digest": "519026eaa30b"
+      },
+      {
+        "query_id": "dq-671",
+        "occurred_ms": 9630000008500,
+        "severity": "high",
+        "datastore": "hr-db",
+        "detector": "brute force auth lockout",
+        "override_pressure_score": 2,
+        "wide_pressure_score": 2,
+        "pressure_index": 4,
+        "chain_id": "083edf22ab",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "3dd59c6e9471",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "083edf22ab"
+        ],
+        "chain_reach_digest": "95c71cd0fa36",
+        "signal_digest": "541dc22d40f3"
+      },
+      {
+        "query_id": "dq-670",
+        "occurred_ms": 9630000008200,
+        "severity": "high",
+        "datastore": "analytics-lake",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 2,
+        "pressure_index": 2,
+        "chain_id": "935ee4bd7a",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "5113ac979d48",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "935ee4bd7a"
+        ],
+        "chain_reach_digest": "2ae7724912b3",
+        "signal_digest": "760cb45dd807"
+      },
+      {
+        "query_id": "dq-641",
+        "occurred_ms": 9630000005200,
+        "severity": "high",
+        "datastore": "customers-db",
+        "detector": "privileged grant abuse",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "4f756ec9ab",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "a4002324d9e4",
+        "chain_reach_score": 41,
+        "chain_reach_depth": 3,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699",
+          "a5af257962",
+          "4f756ec9ab"
+        ],
+        "chain_reach_digest": "620f3060320e",
+        "signal_digest": "e8c2e7337e37"
+      },
+      {
+        "query_id": "dq-640",
+        "occurred_ms": 9630000003900,
+        "severity": "critical",
+        "datastore": "sessions-cache",
+        "detector": "token table sweep",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 2,
+        "pressure_index": 2,
+        "chain_id": "ebbef5783c",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 6,
+        "chain_digest": "74e240a9bb20",
+        "chain_reach_score": 6,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "ebbef5783c"
+        ],
+        "chain_reach_digest": "080410c25879",
+        "signal_digest": "9b5ef4268dbb"
+      },
+      {
+        "query_id": "dq-631",
+        "occurred_ms": 9630000003700,
+        "severity": "critical",
+        "datastore": "audit-store",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "27ee3c0d47",
+        "chain_size": 2,
+        "chain_span_ms": 300,
+        "chain_risk_score": 17,
+        "chain_digest": "a8803d2f0a7b",
+        "chain_reach_score": 37,
+        "chain_reach_depth": 2,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699",
+          "27ee3c0d47"
+        ],
+        "chain_reach_digest": "ca8cc522fa5f",
+        "signal_digest": "3b3f797889f9"
+      },
+      {
+        "query_id": "dq-630",
+        "occurred_ms": 9630000003400,
+        "severity": "critical",
+        "datastore": "hr-db",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "27ee3c0d47",
+        "chain_size": 2,
+        "chain_span_ms": 300,
+        "chain_risk_score": 17,
+        "chain_digest": "a8803d2f0a7b",
+        "chain_reach_score": 37,
+        "chain_reach_depth": 2,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699",
+          "27ee3c0d47"
+        ],
+        "chain_reach_digest": "ca8cc522fa5f",
+        "signal_digest": "a2021abc4898"
+      },
+      {
+        "query_id": "dq-605",
+        "occurred_ms": 9630000003150,
+        "severity": "critical",
+        "datastore": "customers-db",
+        "detector": "service account misuse",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "a5af257962",
+        "chain_size": 2,
+        "chain_span_ms": 150,
+        "chain_risk_score": 11,
+        "chain_digest": "7e01de066c6d",
+        "chain_reach_score": 32,
+        "chain_reach_depth": 2,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699",
+          "a5af257962"
+        ],
+        "chain_reach_digest": "782366f97a87",
+        "signal_digest": "5664033b7571"
+      },
+      {
+        "query_id": "dq-604",
+        "occurred_ms": 9630000003000,
+        "severity": "high",
+        "datastore": "customers-db",
+        "detector": "shadow copy export",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "a5af257962",
+        "chain_size": 2,
+        "chain_span_ms": 150,
+        "chain_risk_score": 11,
+        "chain_digest": "7e01de066c6d",
+        "chain_reach_score": 32,
+        "chain_reach_depth": 2,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699",
+          "a5af257962"
+        ],
+        "chain_reach_digest": "782366f97a87",
+        "signal_digest": "aa86a3409661"
+      },
+      {
+        "query_id": "dq-620",
+        "occurred_ms": 9630000002000,
+        "severity": "high",
+        "datastore": "analytics-lake",
+        "detector": "cross tenant join leak",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 1,
+        "pressure_index": 1,
+        "chain_id": "b1c2f53944",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "d1874148ec74",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "b1c2f53944"
+        ],
+        "chain_reach_digest": "59c6cbc4cb1e",
+        "signal_digest": "eec362ed677a"
+      },
+      {
+        "query_id": "dq-611",
+        "occurred_ms": 9630000001500,
+        "severity": "high",
+        "datastore": "payments-db",
+        "detector": "privilege escalation query",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "cf3101f9ec",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "4638a57fa341",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "cf3101f9ec"
+        ],
+        "chain_reach_digest": "77ec1e102174",
+        "signal_digest": "20ba5a2922c9"
+      },
+      {
+        "query_id": "dq-603",
+        "occurred_ms": 9630000000800,
+        "severity": "high",
+        "datastore": "customers-db",
+        "detector": "unindexed full scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "4a4f922699",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "8edca03e28c5",
+        "chain_reach_score": 17,
+        "chain_reach_depth": 1,
+        "chain_reach_path": [
+          "5a8336fe67",
+          "4a4f922699"
+        ],
+        "chain_reach_digest": "b8ff28eae027",
+        "signal_digest": "4cf7b2d8c726"
+      },
+      {
+        "query_id": "dq-601",
+        "occurred_ms": 9630000000120,
+        "severity": "high",
+        "datastore": "customers-db",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "5a8336fe67",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "e0ed5a2736e0",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "5a8336fe67"
+        ],
+        "chain_reach_digest": "4f198a7c4d04",
+        "signal_digest": "4aca12d5b3f5"
+      }
+    ]
+  },
+  "alternate": {
+    "summary": {
+      "schema_version": "identity-triage-v2",
+      "raw_query_count": 12,
+      "unique_query_ids": 12,
+      "total_queries": 12,
+      "severity_counts": {
+        "critical": 3,
+        "high": 7,
+        "medium": 1,
+        "low": 1
+      },
+      "datastores": [
+        "analytics-lake",
+        "audit-store",
+        "customers-db",
+        "hr-db",
+        "payments-db",
+        "sessions-cache"
+      ],
+      "escalated_count": 8,
+      "dismissed_excluded_count": 1,
+      "override_excluded_count": 1,
+      "override_compaction_checksum": "e9f5057124af47e84353138110df62bf1bda0211aba53761e57fd7786a9f3520",
+      "max_wide_pressure_score": 0,
+      "max_pressure_index": 0,
+      "max_override_pressure_score": 0,
+      "chain_count": 7,
+      "max_chain_risk_score": 17,
+      "chain_digest_checksum": "d12ec8328d4bc3a80552ac74b7583cda629ac5d009e24956b97a5a1060f207ba",
+      "max_chain_reach_score": 37,
+      "chain_reach_digest_checksum": "99fd3c3db1626e0e927eabd1315de5ad2da3e6dd7b7030a6cebbdf222c11d300",
+      "signal_digest_checksum": "289cba51bb3ac24b9c81fa6c78e435b74424a1e29181ec41e233f11aedd75777",
+      "critical_escalation_ids": [
+        "az-01",
+        "az-03",
+        "az-04",
+        "az-05"
+      ],
+      "critical_escalation_count": 4,
+      "max_escalation_pressure": 23,
+      "escalation_ledger_checksum": "ff5637adb59c141165444923e09a67aa1f930240a838ee589763ba13fb6f7467"
+    },
+    "datastore_matrix": {
+      "analytics-lake": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 1
+      },
+      "audit-store": {
+        "critical": 0,
+        "high": 2,
+        "medium": 0,
+        "low": 0
+      },
+      "customers-db": {
+        "critical": 1,
+        "high": 2,
+        "medium": 1,
+        "low": 0
+      },
+      "hr-db": {
+        "critical": 0,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+      },
+      "payments-db": {
+        "critical": 1,
+        "high": 1,
+        "medium": 0,
+        "low": 0
+      },
+      "sessions-cache": {
+        "critical": 1,
+        "high": 0,
+        "medium": 0,
+        "low": 0
+      }
+    },
+    "escalated": [
+      {
+        "query_id": "az-12",
+        "occurred_ms": 9630000005400,
+        "severity": "high",
+        "datastore": "customers-db",
+        "detector": "unindexed full scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "c75853c77b",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "88f1dceebc06",
+        "chain_reach_score": 37,
+        "chain_reach_depth": 2,
+        "chain_reach_path": [
+          "61a3b1aa9d",
+          "b6879e49e7",
+          "c75853c77b"
+        ],
+        "chain_reach_digest": "522699cc1c5d",
+        "signal_digest": "f21b2d0606d4"
+      },
+      {
+        "query_id": "az-11",
+        "occurred_ms": 9630000005100,
+        "severity": "high",
+        "datastore": "audit-store",
+        "detector": "token table sweep",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "75d5ea2f0c",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "af5489162def",
+        "chain_reach_score": 15,
+        "chain_reach_depth": 1,
+        "chain_reach_path": [
+          "a86c940069",
+          "75d5ea2f0c"
+        ],
+        "chain_reach_digest": "c9142b6e5e68",
+        "signal_digest": "e440fc9dc0fa"
+      },
+      {
+        "query_id": "az-07",
+        "occurred_ms": 9630000003700,
+        "severity": "high",
+        "datastore": "audit-store",
+        "detector": "credential in query text",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "a86c940069",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "fad8071e9b7d",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "a86c940069"
+        ],
+        "chain_reach_digest": "954b16c7910b",
+        "signal_digest": "4b708c370129"
+      },
+      {
+        "query_id": "az-06",
+        "occurred_ms": 9630000003100,
+        "severity": "critical",
+        "datastore": "sessions-cache",
+        "detector": "replication sync anomaly",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "a601afe1d6",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 6,
+        "chain_digest": "98014b631ee1",
+        "chain_reach_score": 6,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "a601afe1d6"
+        ],
+        "chain_reach_digest": "af5f9d2b4642",
+        "signal_digest": "a458997ea280"
+      },
+      {
+        "query_id": "az-05",
+        "occurred_ms": 9630000002500,
+        "severity": "high",
+        "datastore": "hr-db",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "b6879e49e7",
+        "chain_size": 2,
+        "chain_span_ms": 400,
+        "chain_risk_score": 17,
+        "chain_digest": "0e6e246ba056",
+        "chain_reach_score": 29,
+        "chain_reach_depth": 1,
+        "chain_reach_path": [
+          "61a3b1aa9d",
+          "b6879e49e7"
+        ],
+        "chain_reach_digest": "a9d0197e6288",
+        "signal_digest": "320914a455a6"
+      },
+      {
+        "query_id": "az-04",
+        "occurred_ms": 9630000002100,
+        "severity": "critical",
+        "datastore": "payments-db",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "b6879e49e7",
+        "chain_size": 2,
+        "chain_span_ms": 400,
+        "chain_risk_score": 17,
+        "chain_digest": "0e6e246ba056",
+        "chain_reach_score": 29,
+        "chain_reach_depth": 1,
+        "chain_reach_path": [
+          "61a3b1aa9d",
+          "b6879e49e7"
+        ],
+        "chain_reach_digest": "a9d0197e6288",
+        "signal_digest": "9b7c13d79de9"
+      },
+      {
+        "query_id": "az-03",
+        "occurred_ms": 9630000001600,
+        "severity": "high",
+        "datastore": "analytics-lake",
+        "detector": "reverse lookup probe",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "9734fa79ad",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 5,
+        "chain_digest": "959e8c35dc7a",
+        "chain_reach_score": 5,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "9734fa79ad"
+        ],
+        "chain_reach_digest": "2cca6b8378d5",
+        "signal_digest": "c425749c7a39"
+      },
+      {
+        "query_id": "az-01",
+        "occurred_ms": 9630000000000,
+        "severity": "critical",
+        "datastore": "customers-db",
+        "detector": "bulk pii exfil scan",
+        "override_pressure_score": 0,
+        "wide_pressure_score": 0,
+        "pressure_index": 0,
+        "chain_id": "61a3b1aa9d",
+        "chain_size": 1,
+        "chain_span_ms": 0,
+        "chain_risk_score": 6,
+        "chain_digest": "17fa0af80f34",
+        "chain_reach_score": 6,
+        "chain_reach_depth": 0,
+        "chain_reach_path": [
+          "61a3b1aa9d"
+        ],
+        "chain_reach_digest": "b1db0527049a",
+        "signal_digest": "d164b4e4a11e"
+      }
+    ]
+  }
+}

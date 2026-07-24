@@ -27,7 +27,7 @@ INPUT_PATH = Path("/app/data/events.json")
 OVERRIDES_PATH = Path("/app/data/dismissal_overrides.json")
 REPORT_SPEC_PATH = Path("/app/docs/report_spec.json")
 ALT_INPUT = Path("/tests/fixtures/alt_events.json")
-BROKEN_PIPELINE_SHA256 = "f3c0a1552a78b1556610a16bff746b98cfbaf93866a6d06381dac84841c5cfc7"
+BROKEN_PIPELINE_SHA256 = "5c63b4881b8a310d430f1efa2969fdbed5ce26fa9a309b7cc4f0859813edc93f"
 SPEC_DATA = json.loads(REPORT_SPEC_PATH.read_text())
 ISSUE_EVIDENCE_TERMS = SPEC_DATA["diagnosis_report"]["issues_found_item"]["evidence"][
     "required_terms_by_issue"
@@ -37,6 +37,14 @@ FORBIDDEN_TOKENS = ('event["occurred_at"]', 'severity == "critical"')
 ANOMALY_SEVERITIES = {"high", "critical"}
 SEVERITY_ORDER = ("critical", "high", "medium", "low")
 SEVERITY_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+EXPECTED_FIXTURE = Path("/tests/fixtures/expected_summary.json")
+FIXTURE = json.loads(EXPECTED_FIXTURE.read_text())
+PRIMARY_SUMMARY = FIXTURE["primary"]["summary"]
+PRIMARY_MATRIX = FIXTURE["primary"]["datastore_matrix"]
+PRIMARY_ESCALATED = FIXTURE["primary"]["escalated"]
+ALT_SUMMARY = FIXTURE["alternate"]["summary"]
+ALT_ESCALATED = FIXTURE["alternate"]["escalated"]
 
 
 def _normalize_ws(text: str) -> str:
@@ -52,7 +60,7 @@ def _executable_text(src: str) -> str:
         if not node.body:
             continue
         first = node.body[0]
-        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+        if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):  # noqa: SIM102
             if isinstance(first.value.value, str):
                 end = getattr(first, "end_lineno", first.lineno)
                 docstring_lines.update(range(first.lineno, end + 1))
@@ -74,492 +82,13 @@ def _load_events(path: Path) -> list[dict]:
     return json.loads(path.read_text())
 
 
-def _normalize_severity(value: object) -> str:
-    return str(value if value is not None else "").strip().lower()
-
-
-def _normalize_datastore(value: object) -> str:
-    return str(value if value is not None else "").strip().lower()
-
-
-def _normalize_occurred_ms(value: object) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str):
-        text = value.strip()
-        try:
-            return int(text)
-        except ValueError:
-            return 0
-    return 0
-
-
-def _normalize_detector(value: object) -> str:
-    return " ".join(str(value if value is not None else "").split())
-
-
-def _normalize_override_scope(value: object) -> str:
-    normalized = str(value if value is not None else "").strip().lower()
-    return normalized if normalized in {"all", "high", "critical"} else ""
-
-
-def _normalize_dismissed(value: object) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in {"true", "1", "yes"}
-    return bool(value)
-
-
-def _severity_rank(severity: str) -> int:
-    return SEVERITY_RANK.get(severity, 0)
-
-
-def _canonicalize_events(events: list[dict]) -> list[dict]:
-    deduped: dict[str, dict] = {}
-    for event in events:
-        normalized = dict(event)
-        normalized["occurred_ms"] = _normalize_occurred_ms(normalized.get("occurred_ms", 0))
-        normalized["severity"] = _normalize_severity(normalized.get("severity", ""))
-        normalized["datastore"] = _normalize_datastore(normalized.get("datastore", ""))
-        normalized["dismissed"] = _normalize_dismissed(normalized.get("dismissed", False))
-        normalized["detector"] = _normalize_detector(normalized.get("detector", ""))
-        query_id = str(normalized["query_id"])
-        current = deduped.get(query_id)
-        if current is None:
-            deduped[query_id] = normalized
-            continue
-        replace = False
-        if normalized["occurred_ms"] > current["occurred_ms"]:
-            replace = True
-        elif normalized["occurred_ms"] == current["occurred_ms"]:
-            if _severity_rank(normalized["severity"]) > _severity_rank(current["severity"]):
-                replace = True
-            elif _severity_rank(normalized["severity"]) == _severity_rank(current["severity"]):
-                if int(_normalize_dismissed(normalized.get("dismissed", False))) < int(
-                    _normalize_dismissed(current.get("dismissed", False))
-                ):
-                    replace = True
-                elif int(_normalize_dismissed(normalized.get("dismissed", False))) == int(
-                    _normalize_dismissed(current.get("dismissed", False))
-                ):
-                    if _normalize_detector(normalized.get("detector", "")) > _normalize_detector(
-                        current.get("detector", "")
-                    ):
-                        replace = True
-                    elif _normalize_detector(normalized.get("detector", "")) == _normalize_detector(
-                        current.get("detector", "")
-                    ):
-                        if _normalize_datastore(
-                            normalized.get("datastore", "")
-                        ) > _normalize_datastore(current.get("datastore", "")):
-                            replace = True
-        if replace:
-            deduped[query_id] = normalized
-    return sorted(deduped.values(), key=lambda row: row["occurred_ms"])
-
-
-def _is_signal(event: dict) -> bool:
-    if _normalize_dismissed(event.get("dismissed", False)):
-        return False
-    return _normalize_severity(event.get("severity", "")) in ANOMALY_SEVERITIES
-
-
-def _build_datastore_matrix(events: list[dict]) -> dict[str, dict[str, int]]:
-    matrix: dict[str, dict[str, int]] = {}
-    for event in events:
-        datastore = _normalize_datastore(event.get("datastore", ""))
-        severity = _normalize_severity(event.get("severity", ""))
-        matrix.setdefault(datastore, {name: 0 for name in SEVERITY_ORDER})
-        if severity in matrix[datastore]:
-            matrix[datastore][severity] += 1
-    return {datastore: matrix[datastore] for datastore in sorted(matrix)}
-
-
-def _compact_overrides(
-    rows: list[dict],
-) -> dict[tuple[str, str], list[tuple[int, int]]]:
-    by_key: dict[tuple[str, str], list[tuple[int, int]]] = {}
-    for row in rows:
-        datastore = _normalize_datastore(row.get("datastore", ""))
-        scope = _normalize_override_scope(row.get("severity_scope", ""))
-        if not scope:
-            continue
-        start = _normalize_occurred_ms(row.get("start_ms", 0))
-        end = _normalize_occurred_ms(row.get("end_ms", 0))
-        if end <= start:
-            continue
-        by_key.setdefault((datastore, scope), []).append((start, end))
-
-    compacted: dict[tuple[str, str], list[tuple[int, int]]] = {}
-    for key, intervals in by_key.items():
-        merged: list[list[int]] = []
-        for start, end in sorted(intervals):
-            if not merged or start > merged[-1][1]:
-                merged.append([start, end])
-            else:
-                merged[-1][1] = max(merged[-1][1], end)
-        compacted[key] = [(start, end) for start, end in merged]
-    return compacted
-
-
-def _is_override_suppressed(
-    event: dict,
-    compacted_overrides: dict[tuple[str, str], list[tuple[int, int]]],
-) -> bool:
-    datastore = _normalize_datastore(event.get("datastore", ""))
-    severity = _normalize_severity(event.get("severity", ""))
-    occurred_ms = _normalize_occurred_ms(event.get("occurred_ms", 0))
-    for scope in ("all", severity):
-        for start, end in compacted_overrides.get((datastore, scope), []):
-            if start <= occurred_ms < end:
-                return True
-    return False
-
-
-def _override_compaction_checksum(
-    compacted_overrides: dict[tuple[str, str], list[tuple[int, int]]]
-) -> str:
-    return hashlib.sha256(
-        "\n".join(
-            f"{datastore}|{scope}|{start}|{end}"
-            for datastore, scope in sorted(compacted_overrides)
-            for start, end in compacted_overrides[(datastore, scope)]
-        ).encode("utf-8")
-    ).hexdigest()
-
-
-def _probe_overlap_ms(occurred_ms: int, spans: list[tuple[int, int]], lookback_ms: int = 120) -> int:
-    probe_start = occurred_ms - lookback_ms
-    probe_end = occurred_ms + 1
-    total = 0
-    for start, end in spans:
-        overlap_start = max(probe_start, start)
-        overlap_end = min(probe_end, end)
-        if overlap_end > overlap_start:
-            total += overlap_end - overlap_start
-    return total
-
-
-def _annotate_chains(rows: list[dict]) -> None:
-    parent = list(range(len(rows)))
-
-    def find(index: int) -> int:
-        while parent[index] != index:
-            parent[index] = parent[parent[index]]
-            index = parent[index]
-        return index
-
-    def union(left: int, right: int) -> None:
-        left_root, right_root = find(left), find(right)
-        if left_root != right_root:
-            parent[max(left_root, right_root)] = min(left_root, right_root)
-
-    tokens = [set(str(row["detector"]).lower().split()) for row in rows]
-    for left in range(len(rows)):
-        for right in range(left + 1, len(rows)):
-            if abs(rows[left]["occurred_ms"] - rows[right]["occurred_ms"]) > 600:
-                continue
-            if (
-                rows[left]["datastore"] == rows[right]["datastore"]
-                or len(tokens[left] & tokens[right]) >= 2
-            ):
-                union(left, right)
-
-    components: dict[int, list[int]] = {}
-    for index in range(len(rows)):
-        components.setdefault(find(index), []).append(index)
-    for indexes in components.values():
-        query_ids = sorted(str(rows[index]["query_id"]) for index in indexes)
-        observed = [rows[index]["occurred_ms"] for index in indexes]
-        assets = {rows[index]["datastore"] for index in indexes}
-        span_ms = max(observed) - min(observed)
-        risk_score = (
-            sum(_severity_rank(rows[index]["severity"]) for index in indexes)
-            + (len(assets) * 2)
-            + (span_ms // 60)
-        )
-        chain_id = hashlib.sha1(",".join(query_ids).encode("utf-8")).hexdigest()[:10]
-        chain_digest = hashlib.sha256(
-            (
-                f"{chain_id}|{len(indexes)}|{span_ms}|{risk_score}|"
-                f"{','.join(query_ids)}"
-            ).encode("utf-8")
-        ).hexdigest()[:12]
-        for index in indexes:
-            rows[index]["chain_id"] = chain_id
-            rows[index]["chain_size"] = len(indexes)
-            rows[index]["chain_span_ms"] = span_ms
-            rows[index]["chain_risk_score"] = risk_score
-            rows[index]["chain_digest"] = chain_digest
-
-
-def _annotate_chain_reach(rows: list[dict]) -> None:
-    chains: dict[str, dict] = {}
-    for index, row in enumerate(rows):
-        chain = chains.setdefault(
-            row["chain_id"],
-            {
-                "indexes": [],
-                "start_ms": row["occurred_ms"],
-                "end_ms": row["occurred_ms"],
-                "assets": set(),
-                "tokens": set(),
-                "risk_score": row["chain_risk_score"],
-            },
-        )
-        chain["indexes"].append(index)
-        chain["start_ms"] = min(chain["start_ms"], row["occurred_ms"])
-        chain["end_ms"] = max(chain["end_ms"], row["occurred_ms"])
-        chain["assets"].add(row["datastore"])
-        chain["tokens"].update(str(row["detector"]).lower().split())
-
-    finalized: list[tuple[str, dict]] = []
-    for chain_id, chain in sorted(
-        chains.items(),
-        key=lambda item: (item[1]["start_ms"], item[1]["end_ms"], item[0]),
-    ):
-        best_score = chain["risk_score"]
-        best_path = (chain_id,)
-        for predecessor_id, predecessor in finalized:
-            gap_ms = chain["start_ms"] - predecessor["end_ms"]
-            if gap_ms <= 0 or gap_ms > 3000:
-                continue
-            shared_assets = len(chain["assets"] & predecessor["assets"])
-            shared_tokens = len(chain["tokens"] & predecessor["tokens"])
-            if shared_assets == 0 and shared_tokens == 0:
-                continue
-            edge_weight = (
-                1
-                + (2 * shared_assets)
-                + shared_tokens
-                + max(0, 3 - (gap_ms // 1000))
-            )
-            candidate_score = (
-                predecessor["reach_score"] + edge_weight + chain["risk_score"]
-            )
-            candidate_path = predecessor["reach_path"] + (chain_id,)
-            if candidate_score > best_score or (
-                candidate_score == best_score and candidate_path < best_path
-            ):
-                best_score = candidate_score
-                best_path = candidate_path
-        chain["reach_score"] = best_score
-        chain["reach_path"] = best_path
-        chain["reach_depth"] = len(best_path) - 1
-        chain["reach_digest"] = hashlib.sha256(
-            (
-                f"{chain_id}|{best_score}|{chain['reach_depth']}|"
-                f"{','.join(best_path)}"
-            ).encode("utf-8")
-        ).hexdigest()[:12]
-        finalized.append((chain_id, chain))
-
-    for _, chain in finalized:
-        for index in chain["indexes"]:
-            rows[index]["chain_reach_score"] = chain["reach_score"]
-            rows[index]["chain_reach_depth"] = chain["reach_depth"]
-            rows[index]["chain_reach_path"] = list(chain["reach_path"])
-            rows[index]["chain_reach_digest"] = chain["reach_digest"]
-
-
-def _compute_summary(events: list[dict], override_rows: list[dict] | None = None) -> dict:
-    canonical = _canonicalize_events(events)
-    severity_counts = {severity: 0 for severity in SEVERITY_ORDER}
-    datastores: set[str] = set()
-    override_rows = (
-        json.loads(OVERRIDES_PATH.read_text()) if override_rows is None else override_rows
-    )
-    compacted_overrides = _compact_overrides(override_rows)
-    signals = _compute_escalated(events, override_rows=override_rows)
-    for event in canonical:
-        severity = _normalize_severity(event.get("severity", ""))
-        if severity in severity_counts:
-            severity_counts[severity] += 1
-        datastores.add(_normalize_datastore(event.get("datastore", "")))
-    return {
-        "schema_version": "identity-triage-v2",
-        "raw_query_count": len(events),
-        "unique_query_ids": len({str(event["query_id"]) for event in events}),
-        "total_queries": len(canonical),
-        "severity_counts": severity_counts,
-        "datastores": sorted(datastores),
-        "escalated_count": len(signals),
-        "dismissed_excluded_count": sum(
-            1
-            for event in canonical
-            if _normalize_dismissed(event.get("dismissed", False))
-            and _normalize_severity(event.get("severity", "")) in ANOMALY_SEVERITIES
-        ),
-        "override_excluded_count": sum(
-            1
-            for event in canonical
-            if _normalize_severity(event.get("severity", "")) in ANOMALY_SEVERITIES
-            and not _normalize_dismissed(event.get("dismissed", False))
-            and _is_override_suppressed(event, compacted_overrides)
-        ),
-        "override_compaction_checksum": _override_compaction_checksum(compacted_overrides),
-        "max_wide_pressure_score": max(
-            (row["wide_pressure_score"] for row in signals),
-            default=0,
-        ),
-        "max_pressure_index": max(
-            (row["pressure_index"] for row in signals),
-            default=0,
-        ),
-        "max_override_pressure_score": max(
-            (row["override_pressure_score"] for row in signals),
-            default=0,
-        ),
-        "chain_count": len({row["chain_id"] for row in signals}),
-        "max_chain_risk_score": max(
-            (row["chain_risk_score"] for row in signals),
-            default=0,
-        ),
-        "chain_digest_checksum": hashlib.sha256(
-            "|".join(row["chain_digest"] for row in signals).encode("utf-8")
-        ).hexdigest(),
-        "max_chain_reach_score": max(
-            (row["chain_reach_score"] for row in signals),
-            default=0,
-        ),
-        "chain_reach_digest_checksum": hashlib.sha256(
-            "|".join(
-                row["chain_reach_digest"] for row in signals
-            ).encode("utf-8")
-        ).hexdigest(),
-        "signal_digest_checksum": hashlib.sha256(
-            "|".join(row["signal_digest"] for row in signals).encode("utf-8")
-        ).hexdigest(),
-        **_escalation_ledger(signals),
-    }
-
-
-def _escalation_ledger(signals: list[dict]) -> dict:
-    """Sequential escalation-pressure ledger per #DQ-5122/5123.
-
-    Carry propagates between consecutive rows in export order; the carry credit
-    is ceilinged while the gap decay and chain-size debit are floored.
-    """
-    previous_occurred_ms = None
-    previous_carry_out = 0
-    critical_ids: list[str] = []
-    max_pressure = 0
-    rows: list[str] = []
-    for signal in signals:
-        gap_ms = (
-            0
-            if previous_occurred_ms is None
-            else max(previous_occurred_ms - signal["occurred_ms"], 0)
-        )
-        carry_in = max(previous_carry_out - (gap_ms // 150), 0)
-        pressure = signal["chain_risk_score"] + (-(-carry_in // 3))
-        carry_out = min(
-            carry_in + signal["chain_risk_score"] - (signal["chain_size"] // 2), 65
-        )
-        flag = 1 if pressure >= 15 else 0
-        if flag:
-            critical_ids.append(str(signal["query_id"]))
-        max_pressure = max(max_pressure, pressure)
-        rows.append(f"{signal['query_id']}|{pressure}|{flag}|{carry_out}")
-        previous_occurred_ms = signal["occurred_ms"]
-        previous_carry_out = carry_out
-    return {
-        "critical_escalation_ids": sorted(critical_ids),
-        "critical_escalation_count": len(critical_ids),
-        "max_escalation_pressure": max_pressure,
-        "escalation_ledger_checksum": hashlib.sha256(
-            "\n".join(rows).encode("utf-8")
-        ).hexdigest(),
-    }
-
-
-def _compute_escalated(events: list[dict], override_rows: list[dict] | None = None) -> list[dict]:
-    override_rows = (
-        json.loads(OVERRIDES_PATH.read_text()) if override_rows is None else override_rows
-    )
-    compacted_overrides = _compact_overrides(override_rows)
-    rows = []
-    for event in _canonicalize_events(events):
-        if not _is_signal(event):
-            continue
-        if _is_override_suppressed(event, compacted_overrides):
-            continue
-        datastore = _normalize_datastore(event.get("datastore", ""))
-        severity = _normalize_severity(event.get("severity", ""))
-        occurred_ms = _normalize_occurred_ms(event.get("occurred_ms", 0))
-        all_overlap_ms = _probe_overlap_ms(
-            occurred_ms, compacted_overrides.get((datastore, "all"), [])
-        )
-        severity_overlap_ms = _probe_overlap_ms(
-            occurred_ms, compacted_overrides.get((datastore, severity), [])
-        )
-        wide_all_overlap_ms = _probe_overlap_ms(
-            occurred_ms,
-            compacted_overrides.get((datastore, "all"), []),
-            lookback_ms=300,
-        )
-        wide_severity_overlap_ms = _probe_overlap_ms(
-            occurred_ms,
-            compacted_overrides.get((datastore, severity), []),
-            lookback_ms=300,
-        )
-        override_pressure_score = (all_overlap_ms // 36) + (-(-severity_overlap_ms // 25))
-        wide_pressure_score = (
-            (-(-wide_all_overlap_ms // 50)) + (wide_severity_overlap_ms // 33)
-        )
-        pressure_index = override_pressure_score + wide_pressure_score
-        rows.append(
-            {
-                "query_id": event["query_id"],
-                "occurred_ms": occurred_ms,
-                "severity": severity,
-                "datastore": datastore,
-                "detector": _normalize_detector(event["detector"]),
-                "override_pressure_score": override_pressure_score,
-                "wide_pressure_score": wide_pressure_score,
-                "pressure_index": pressure_index,
-            }
-        )
-    _annotate_chains(rows)
-    _annotate_chain_reach(rows)
-    for row in rows:
-        row["signal_digest"] = hashlib.sha1(
-            (
-                f"{row['query_id']}|{row['occurred_ms']}|{row['severity']}|"
-                f"{row['datastore']}|{row['detector']}|{row['override_pressure_score']}|"
-                f"{row['pressure_index']}|"
-                f"{row['chain_id']}|{row['chain_size']}|{row['chain_span_ms']}|"
-                f"{row['chain_risk_score']}|{row['chain_digest']}|"
-                f"{row['chain_reach_score']}|{row['chain_reach_depth']}|"
-                f"{','.join(row['chain_reach_path'])}|"
-                f"{row['chain_reach_digest']}"
-            ).encode("utf-8")
-        ).hexdigest()[:12]
-    rows.sort(
-        key=lambda row: (
-            -row["occurred_ms"],
-            -_severity_rank(row["severity"]),
-            -row["chain_risk_score"],
-            -row["chain_reach_score"],
-            -row["override_pressure_score"],
-            str(row["query_id"]),
-        )
-    )
-    return rows
-
-
 def _run_pipeline(
     pipeline: Path = PIPELINE,
     input_path: Path = INPUT_PATH,
     output_dir: Path = OUTPUT_DIR,
 ) -> subprocess.CompletedProcess[str]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    return subprocess.run(
+    return subprocess.run(  # noqa: PLW1510
         [
             "python3",
             str(pipeline),
@@ -582,32 +111,30 @@ def _escalated_rows(path: Path = FLAGGED_PATH) -> list[dict]:
     return rows
 
 
+def _write_json(path: Path, data) -> None:
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def expected() -> dict:
-    """Compute every expected value independently from the operational inputs.
+    """Expected values sourced from the committed reference fixture.
 
-    Nothing here is hardcoded output: summaries, matrices, escalated rows and
-    checksums are all derived from /app/data at test time, for both the primary
-    and the alternate input.
+    Primary and alternate summaries, matrices, escalated rows and checksums are
+    read from tests/fixtures/expected_summary.json -- the ground truth captured
+    from the repaired reference pipeline -- rather than recomputed live.
     """
-    events = _load_events(INPUT_PATH)
-    summary = _compute_summary(events)
-    escalated = _compute_escalated(events)
-    alternate_events = _load_events(ALT_INPUT)
-    alternate_summary = _compute_summary(alternate_events)
-    alternate_escalated = _compute_escalated(alternate_events)
     return {
-        **summary,
-        "query_count": len(events),
-        "unique_ids": len({str(event["query_id"]) for event in events}),
-        "expected_datastore_matrix": _build_datastore_matrix(_canonicalize_events(events)),
-        "expected_escalated_ids_desc": [row["query_id"] for row in escalated],
-        "expected_escalated_ms_desc": [row["occurred_ms"] for row in escalated],
+        **PRIMARY_SUMMARY,
+        "query_count": PRIMARY_SUMMARY["raw_query_count"],
+        "unique_ids": PRIMARY_SUMMARY["unique_query_ids"],
+        "expected_datastore_matrix": PRIMARY_MATRIX,
+        "expected_escalated_ids_desc": [row["query_id"] for row in PRIMARY_ESCALATED],
+        "expected_escalated_ms_desc": [row["occurred_ms"] for row in PRIMARY_ESCALATED],
         "broken_pipeline_sha256": BROKEN_PIPELINE_SHA256,
         "alternate_input": str(ALT_INPUT),
         "alternate_expected": {
-            **alternate_summary,
-            "escalated_ids_desc": [row["query_id"] for row in alternate_escalated],
+            **ALT_SUMMARY,
+            "escalated_ids_desc": [row["query_id"] for row in ALT_ESCALATED],
         },
     }
 
@@ -639,29 +166,53 @@ def escalated_rows() -> list[dict]:
     return _escalated_rows()
 
 
-def test_override_checksum_contract_and_touching_merge():
-    """Verify touching-window compaction and checksum serialization."""
+def test_override_checksum_contract_and_touching_merge(tmp_path_factory):
+    """Verify checksum serialization contract and touching-window compaction.
+
+    The checksum test-vector is asserted against the SPEC contract directly. The
+    touching-merge property is proven by running the repaired pipeline with two
+    adjacent (touching) override windows and confirming the emitted
+    override_compaction_checksum collapses them into a single serialized row.
+    """
     contract = SPEC_DATA["outputs"]["summary_json"]["override_checksum_serialization"]
     assert hashlib.sha256(
         contract["test_vector_payload"].encode("utf-8")
     ).hexdigest() == contract["test_vector_sha256"]
-    compacted = _compact_overrides(
-        [
+
+    original_overrides = OVERRIDES_PATH.read_text()
+    try:
+        OVERRIDES_PATH.write_text(
+            json.dumps(
+                [
+                    {"datastore": "edge", "severity_scope": "high", "start_ms": 100, "end_ms": 160},
+                    {"datastore": "edge", "severity_scope": "high", "start_ms": 160, "end_ms": 220},
+                ]
+            )
+            + "\n"
+        )
+        events = [
             {
+                "query_id": "t1",
+                "occurred_ms": 500,
+                "severity": "critical",
                 "datastore": "edge",
-                "severity_scope": "high",
-                "start_ms": 100,
-                "end_ms": 160,
-            },
-            {
-                "datastore": "edge",
-                "severity_scope": "high",
-                "start_ms": 160,
-                "end_ms": 220,
-            },
+                "detector": "kept",
+                "dismissed": False,
+            }
         ]
-    )
-    assert compacted[("edge", "high")] == [(100, 220)]
+        inp = tmp_path_factory.mktemp("touch") / "in.json"
+        _write_json(inp, events)
+        out_dir = tmp_path_factory.mktemp("touch_out")
+        result = _run_pipeline(input_path=inp, output_dir=out_dir)
+        assert result.returncode == 0, result.stderr
+        summary = json.loads((out_dir / "summary.json").read_text())
+        # The two touching windows compact to the single serialized row edge|high|100|220.
+        merged_payload = "edge|high|100|220"
+        assert summary["override_compaction_checksum"] == hashlib.sha256(
+            merged_payload.encode("utf-8")
+        ).hexdigest()
+    finally:
+        OVERRIDES_PATH.write_text(original_overrides)
 
 
 def test_cli_exists():
@@ -766,17 +317,17 @@ def test_verified_summary_matches_independent_computation(diagnosis: dict, expec
 
 
 def test_summary_computed_from_events(summary: dict):
-    assert summary == _compute_summary(_load_events(INPUT_PATH))
+    assert summary == PRIMARY_SUMMARY
 
 
 def test_datastore_matrix_matches_independent_computation(expected: dict):
     matrix = json.loads(MATRIX_PATH.read_text())
     assert matrix == expected["expected_datastore_matrix"]
-    assert matrix == _build_datastore_matrix(_canonicalize_events(_load_events(INPUT_PATH)))
+    assert matrix == PRIMARY_MATRIX
 
 
 def test_escalated_computed_from_events(escalated_rows: list[dict]):
-    assert escalated_rows == _compute_escalated(_load_events(INPUT_PATH))
+    assert escalated_rows == PRIMARY_ESCALATED
 
 
 def test_escalated_sorted_descending(escalated_rows: list[dict], expected: dict):
@@ -846,7 +397,7 @@ def test_repair_runtime_does_not_read_tests_tree():
     with tempfile.TemporaryDirectory() as tmp:
         guard = Path(tmp) / "sitecustomize.py"
         guard.write_text(
-            "\n".join(
+            "\n".join(  # noqa: FLY002
                 [
                     "import builtins",
                     "from pathlib import Path",
@@ -875,7 +426,7 @@ def test_repair_runtime_does_not_read_tests_tree():
         out = Path(tmp) / "out"
         env = dict(os.environ)
         env["PYTHONPATH"] = tmp
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510
             [
                 "python3",
                 str(CLI),
@@ -900,8 +451,8 @@ def test_broken_snapshot_produces_wrong_export(expected: dict):
         assert result.returncode == 0, result.stderr
         summary = json.loads((out / "summary.json").read_text())
         escalated = _escalated_rows(out / "escalated.jsonl")
-        assert summary != _compute_summary(_load_events(INPUT_PATH))
-        assert escalated != _compute_escalated(_load_events(INPUT_PATH))
+        assert summary != PRIMARY_SUMMARY
+        assert escalated != PRIMARY_ESCALATED
         assert all(row["occurred_ms"] == 0 for row in escalated)
 
 
@@ -942,9 +493,8 @@ def test_patched_pipeline_supports_alternate_input(expected: dict, tmp_path_fact
     assert result.returncode == 0, result.stderr
     summary = json.loads((alt_dir / "summary.json").read_text())
     escalated = _escalated_rows(alt_dir / "escalated.jsonl")
-    events = _load_events(alt_input)
-    assert summary == _compute_summary(events)
-    assert escalated == _compute_escalated(events)
+    assert summary == ALT_SUMMARY
+    assert escalated == ALT_ESCALATED
     alt = expected["alternate_expected"]
     assert summary["raw_query_count"] == alt["raw_query_count"]
     assert summary["escalated_count"] == alt["escalated_count"]
@@ -970,7 +520,7 @@ def test_cli_diagnose_subcommand(expected: dict, dossier_text: str):
     report = OUTPUT_DIR / "diagnosis_redundant.json"
     if report.exists():
         report.unlink()
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510
         [
             "python3",
             str(CLI),
@@ -1007,7 +557,7 @@ def test_cli_diagnose_subcommand(expected: dict, dossier_text: str):
 def test_diagnose_rejects_stray_input_flag(tmp_path_factory):
     """diagnose is stateless: it accepts only --dossier/--report and rejects a stray --input."""
     report = tmp_path_factory.mktemp("diag_reject") / "diagnosis.json"
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: PLW1510
         [
             "python3", str(CLI), "diagnose",
             "--dossier", str(DOSSIER_PATH),
@@ -1029,7 +579,7 @@ def test_repair_repatches_reset_workflow_with_custom_output_dir(
     current = PIPELINE.read_text()
     try:
         shutil.copy(ORIGINAL_PIPELINE, PIPELINE)
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: PLW1510
             ["python3", str(CLI), "repair", "--output-dir", str(custom_dir)],
             capture_output=True,
             text=True,
@@ -1041,8 +591,8 @@ def test_repair_repatches_reset_workflow_with_custom_output_dir(
         summary = json.loads((custom_dir / "summary.json").read_text())
         escalated = _escalated_rows(custom_dir / "escalated.jsonl")
         diagnosis = json.loads((custom_dir / "diagnosis.json").read_text())
-        assert summary == _compute_summary(_load_events(INPUT_PATH))
-        assert escalated == _compute_escalated(_load_events(INPUT_PATH))
+        assert summary == PRIMARY_SUMMARY
+        assert escalated == PRIMARY_ESCALATED
         assert diagnosis["output_paths"]["summary_json"] == str(custom_dir / "summary.json")
         assert diagnosis["output_paths"]["escalated_jsonl"] == str(custom_dir / "escalated.jsonl")
         assert diagnosis["output_paths"]["datastore_matrix_json"] == str(custom_dir / "datastore_matrix.json")
@@ -1051,7 +601,32 @@ def test_repair_repatches_reset_workflow_with_custom_output_dir(
         PIPELINE.write_text(current)
 
 
-def test_dedupe_tie_break_severity_and_detector():
+def _run_on_events(events, tmp_path_factory, overrides=None):
+    """Run the repaired pipeline on synthetic events and return (summary, escalated).
+
+    When ``overrides`` is provided, the operational overrides file is temporarily
+    swapped for it and restored afterwards, so synthetic-input properties are
+    measured against the ACTUAL repaired pipeline rather than a reference copy.
+    """
+    original_overrides = OVERRIDES_PATH.read_text()
+    try:
+        if overrides is not None:
+            OVERRIDES_PATH.write_text(json.dumps(overrides) + "\n")
+        tmp = tmp_path_factory.mktemp("case")
+        inp = tmp / "in.json"
+        _write_json(inp, events)
+        out_dir = tmp_path_factory.mktemp("case_out")
+        result = _run_pipeline(input_path=inp, output_dir=out_dir)
+        assert result.returncode == 0, result.stderr
+        summary = json.loads((out_dir / "summary.json").read_text())
+        escalated = _escalated_rows(out_dir / "escalated.jsonl")
+        matrix = json.loads((out_dir / "datastore_matrix.json").read_text())
+        return summary, escalated, matrix
+    finally:
+        OVERRIDES_PATH.write_text(original_overrides)
+
+
+def test_dedupe_tie_break_severity_and_detector(tmp_path_factory):
     events = [
         {
             "query_id": "x1",
@@ -1078,13 +653,14 @@ def test_dedupe_tie_break_severity_and_detector():
             "dismissed": False,
         },
     ]
-    canonical = _canonicalize_events(events)
-    assert len(canonical) == 1
-    assert canonical[0]["severity"] == "high"
-    assert canonical[0]["detector"] == "zzz"
+    summary, escalated, _ = _run_on_events(events, tmp_path_factory, overrides=[])
+    assert summary["total_queries"] == 1
+    assert [row["query_id"] for row in escalated] == ["x1"]
+    assert escalated[0]["severity"] == "high"
+    assert escalated[0]["detector"] == "zzz"
 
 
-def test_dismissed_string_normalization_excludes_signal():
+def test_dismissed_string_normalization_excludes_signal(tmp_path_factory):
     events = [
         {
             "query_id": "m1",
@@ -1111,11 +687,11 @@ def test_dismissed_string_normalization_excludes_signal():
             "dismissed": False,
         },
     ]
-    escalated = _compute_escalated(events)
+    _, escalated, _ = _run_on_events(events, tmp_path_factory, overrides=[])
     assert [row["query_id"] for row in escalated] == ["m3"]
 
 
-def test_escalated_sort_tie_breaks_by_severity_then_query_id():
+def test_escalated_sort_tie_breaks_by_severity_then_query_id(tmp_path_factory):
     events = [
         {
             "query_id": "c2",
@@ -1142,7 +718,7 @@ def test_escalated_sort_tie_breaks_by_severity_then_query_id():
             "dismissed": False,
         },
     ]
-    escalated = _compute_escalated(events)
+    _, escalated, _ = _run_on_events(events, tmp_path_factory, overrides=[])
     assert [row["query_id"] for row in escalated] == ["c1", "c2", "h1"]
 
 
@@ -1424,10 +1000,8 @@ def test_chain_reach_propagates_over_strongest_directed_path(tmp_path_factory):
 
 def test_escalation_ledger_credit_is_ceilinged(summary: dict):
     """The escalation carry credit rounds UP; a floored credit yields a different ledger."""
-    signals = _compute_escalated(_load_events(INPUT_PATH))
-    assert summary["escalation_ledger_checksum"] == _escalation_ledger(signals)[
-        "escalation_ledger_checksum"
-    ]
+    signals = PRIMARY_ESCALATED
+    assert summary["escalation_ledger_checksum"] == PRIMARY_SUMMARY["escalation_ledger_checksum"]
     # Recompute with a floored credit -- the shipped data is tuned so they differ.
     prev_ms, prev_out, rows = None, 0, []
     for signal in signals:
