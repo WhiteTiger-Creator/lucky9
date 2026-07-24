@@ -19,9 +19,9 @@ COPY app/ /app/
 RUN cp /app/workflow/export_report.py /app/workflow/.export_report.original \
     && chmod a-w /app/workflow/.export_report.original
 
-# Persistence and escalation paths left behind on the data-store platform during the Vaultwatch
-# intrusion: a rogue sync-automation key, a passwordless sudoers escalation, and a
-# world-readable datastore query-signing key.
+# Stray configuration the sync automation left on the data-store node: an extra deploy key in
+# root's authorized_keys, a passwordless sudoers drop-in, and a world-readable datastore
+# query-signing key.
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh \
     && printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH7pQ2mVc4tXbN9sKfWjLd0aRyEuZoPnT3xBvMqGhKlS ops-oncall@bastion\n' > /root/.ssh/authorized_keys \
     && printf 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJx4jTq0d6nUcy0dGkzsBv1qkNPjc3hAcVcbWlkfZ2Qq dbnode-sync-automation\n' >> /root/.ssh/authorized_keys \
